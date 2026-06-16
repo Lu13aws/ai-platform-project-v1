@@ -10,11 +10,13 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
+_PRODUCTION_ORIGINS = ["https://bridging-data.com"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"] if settings.is_development else [],
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=["*"] if settings.is_development else _PRODUCTION_ORIGINS,
+    allow_methods=["GET", "POST"],
+    allow_headers=["Content-Type", "Authorization"],
 )
 
 app.include_router(router, prefix="/api/v1")

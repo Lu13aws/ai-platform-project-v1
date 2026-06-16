@@ -1,0 +1,32 @@
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Secrets — never bake into image
+.env
+.env.*
+
+# Local data
+data/
+docker/
+
+# Docs and scripts not needed at runtime
+docs/
+research/
+scripts/
+tests/
+notebooks/
+
+# Git
+.git/
+.gitignore
+
+# IDE
+.idea/
+.vscode/
