@@ -123,9 +123,10 @@ The `docker/postgres/init.sql` script enables the `vector` and `uuid-ossp` exten
 ### PostgreSQL + pgvector (AWS RDS)
 
 - Engine: PostgreSQL 16 with `pgvector` extension
-- Instance: `db.t3.micro` (MVP)
-- Enable extension after creation: `CREATE EXTENSION IF NOT EXISTS vector;`
-- Connect string format: `postgresql+asyncpg://user:pass@host:5432/dbname`
+- Instance: `db.t3.micro`, eu-central-1, free tier
+- Endpoint: `ai-platform-db.cvs0uioe8sum.eu-central-1.rds.amazonaws.com:5432`
+- Enable extensions on fresh RDS: `uv run python scripts/enable_extensions.py`
+- Run migrations against RDS: `uv run alembic upgrade head`
 
 ### Amazon S3
 
@@ -133,11 +134,24 @@ The `docker/postgres/init.sql` script enables the `vector` and `uuid-ossp` exten
 - Structure: `raw/{app_name}/{document_id}/`
 - Access: IAM role with `s3:GetObject`, `s3:PutObject`, `s3:DeleteObject`
 
-### AWS API Gateway + Lambda / ECS
+### AWS Lambda + API Gateway (live)
 
-- Expose `POST /api/v1/ingest` and `POST /api/v1/query` publicly
-- CORS: allow `https://bridging-data.com`
-- Rate limiting: configured at API Gateway level
+- **Public API:** `https://72w6p1rx38.execute-api.eu-central-1.amazonaws.com`
+- Health: `GET /health`
+- Docs: `GET /docs`
+- Query: `POST /api/v1/query`
+- Ingest: `POST /api/v1/ingest`
+- CORS: `https://bridging-data.com` (production), `*` (development)
+- Lambda: `ai-platform-rag-demo`, 512 MB, 60s timeout, container image
+- ECR: `759302162548.dkr.ecr.eu-central-1.amazonaws.com/ai-platform-rag-demo:lambda`
+
+**Redeploy after code changes:**
+```bash
+docker build -f Dockerfile.lambda -t ai-platform-rag-demo:lambda .
+docker tag ai-platform-rag-demo:lambda 759302162548.dkr.ecr.eu-central-1.amazonaws.com/ai-platform-rag-demo:lambda
+docker push 759302162548.dkr.ecr.eu-central-1.amazonaws.com/ai-platform-rag-demo:lambda
+uv run python scripts/deploy_lambda.py
+```
 
 ---
 
@@ -320,6 +334,22 @@ Updated `pyproject.toml` (`packages`, `src`, `coverage.source`) and `Makefile` (
 
 ## Project Progress
 
+### 20260616 — Phase 1 deployed to AWS
+
+**Completed today:**
+- RDS PostgreSQL 16 + pgvector provisioned in eu-central-1 (db.t3.micro, free tier)
+- Docker images built: `Dockerfile` (standard) + `Dockerfile.lambda` (Lambda-optimized)
+- Lambda function deployed with Mangum ASGI adapter (container image)
+- API Gateway HTTP API live with CORS for bridging-data.com
+- 822 chunks re-seeded into cloud RDS
+- End-to-end query verified on public endpoint
+- Switched from App Runner (discontinued April 2026) to Lambda + API Gateway
+
+**Note:** AWS App Runner stopped accepting new customers on April 30, 2026.
+Lambda + API Gateway is the replacement for low-traffic portfolio demos.
+
+---
+
 ### 20260615 — Phase 1 complete: full RAG pipeline working end-to-end
 
 **Completed today:**
@@ -344,11 +374,7 @@ Updated `pyproject.toml` (`packages`, `src`, `coverage.source`) and `Makefile` (
 - `RETRIEVAL_SIMILARITY_THRESHOLD` lowered from 0.75 → 0.5 for realistic short-doc matching
 
 **Next session:**
-- Deploy RDS PostgreSQL + pgvector on AWS
-- Containerize FastAPI (Dockerfile)
-- Deploy to AWS App Runner (public HTTPS endpoint)
-- Update CORS to `https://bridging-data.com`
-- Add chat widget to portfolio site
+- Add chat widget to bridging-data.com portfolio site (`/[locale]/ai-demo/`)
 
 ---
 
