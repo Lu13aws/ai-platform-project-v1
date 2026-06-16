@@ -10,7 +10,7 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
-_PRODUCTION_ORIGINS = ["https://bridging-data.com"]
+_PRODUCTION_ORIGINS = ["https://bridging-data.com", "https://www.bridging-data.com"]
 
 app.add_middleware(
     CORSMiddleware,

@@ -107,7 +107,7 @@ def deploy_api_gateway(apigw: boto3.client, lmb: boto3.client, fn_arn: str) -> s
         ProtocolType="HTTP",
         Target=fn_arn,
         CorsConfiguration={
-            "AllowOrigins": ["https://bridging-data.com", "http://localhost:3000"],
+            "AllowOrigins": ["https://bridging-data.com", "https://www.bridging-data.com", "http://localhost:3000"],
             "AllowMethods": ["GET", "POST"],
             "AllowHeaders": ["Content-Type", "Authorization"],
         },
