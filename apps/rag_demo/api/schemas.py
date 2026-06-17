@@ -42,6 +42,7 @@ class RadarEntrySchema(BaseModel):
     technology_name: str
     vendor: str
     category: str
+    previous_category: str | None
     summary: str
     trend: str
     signal_count: int
