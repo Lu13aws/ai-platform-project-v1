@@ -48,6 +48,9 @@ ai-platform-project-v1/
 
 ## Final Architecture
 
+https://miro.com/app/board/uXjVHErgZ40=/?moveToWidget=3458764675722816283&cot=14
+https://miro.com/app/board/uXjVHErgZ40=/?moveToWidget=3458764675724444499&cot=14
+
 ```
 Client (bridging-data.com / CLI)
 → AWS API Gateway
