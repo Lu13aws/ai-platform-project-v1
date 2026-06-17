@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from pydantic import BaseModel, Field
 
 
@@ -32,3 +34,33 @@ class QueryResponse(BaseModel):
     model: str
     input_tokens: int
     output_tokens: int
+
+
+# ── Radar ─────────────────────────────────────────────────────────────────────
+
+class RadarEntrySchema(BaseModel):
+    technology_name: str
+    vendor: str
+    category: str
+    summary: str
+    trend: str
+    signal_count: int
+    last_updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class RadarEntriesResponse(BaseModel):
+    entry_count: int
+    entries: dict[str, list[RadarEntrySchema]]  # keyed by category
+
+
+class RadarReportResponse(BaseModel):
+    generated_at: datetime
+    s3_key: str | None
+    source_count: int
+    signal_count: int
+    entry_count: int
+    report_schema_version: int
+
+    model_config = {"from_attributes": True}

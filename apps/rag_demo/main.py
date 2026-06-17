@@ -1,4 +1,5 @@
 from aiplatform.settings import settings
+from apps.rag_demo.api.radar_routes import router as radar_router
 from apps.rag_demo.api.routes import router
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -20,6 +21,7 @@ app.add_middleware(
 )
 
 app.include_router(router, prefix="/api/v1")
+app.include_router(radar_router, prefix="/api/v1")
 
 
 @app.get("/health")

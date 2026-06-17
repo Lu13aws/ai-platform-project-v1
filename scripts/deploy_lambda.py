@@ -6,11 +6,15 @@ Usage:
     uv run python scripts/deploy_lambda.py
 
 Re-running is safe: updates existing function/API instead of creating duplicates.
+
+VPC: if infra/vpc_config.json exists (created by setup_vpc.py), Lambda is deployed
+into the private subnets. Otherwise deploys without VPC config (backwards compatible).
 """
 
 import json
 import sys
 import time
+from pathlib import Path
 
 import boto3
 
@@ -22,31 +26,49 @@ FUNCTION_NAME = "ai-platform-rag-demo"
 ECR_IMAGE = f"{ACCOUNT_ID}.dkr.ecr.{REGION}.amazonaws.com/ai-platform-rag-demo:lambda"
 ROLE_NAME = "ai-platform-lambda-role"
 
+_VPC_POLICY = "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
+_BASIC_POLICY = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 
-def create_or_get_role(iam: boto3.client) -> str:
+
+def load_vpc_config() -> dict | None:
+    path = Path("infra/vpc_config.json")
+    if not path.exists():
+        print("  [info] infra/vpc_config.json not found — deploying without VPC config")
+        return None
+    config = json.loads(path.read_text())
+    print(f"  [ok] VPC config loaded: {config['vpc_id']}")
+    return config
+
+
+def create_or_get_role(iam, use_vpc: bool) -> str:
     try:
         role = iam.get_role(RoleName=ROLE_NAME)
+        role_arn = role["Role"]["Arn"]
         print(f"  [ok] role '{ROLE_NAME}' already exists")
-        return role["Role"]["Arn"]
     except iam.exceptions.NoSuchEntityException:
-        pass
+        assume_policy = json.dumps({
+            "Version": "2012-10-17",
+            "Statement": [{
+                "Effect": "Allow",
+                "Principal": {"Service": "lambda.amazonaws.com"},
+                "Action": "sts:AssumeRole",
+            }],
+        })
+        role = iam.create_role(RoleName=ROLE_NAME, AssumeRolePolicyDocument=assume_policy)
+        role_arn = role["Role"]["Arn"]
+        iam.attach_role_policy(RoleName=ROLE_NAME, PolicyArn=_BASIC_POLICY)
+        print(f"  [ok] role '{ROLE_NAME}' created — waiting 15s for IAM propagation...")
+        time.sleep(15)
 
-    assume_policy = json.dumps({
-        "Version": "2012-10-17",
-        "Statement": [{
-            "Effect": "Allow",
-            "Principal": {"Service": "lambda.amazonaws.com"},
-            "Action": "sts:AssumeRole",
-        }],
-    })
-    role = iam.create_role(RoleName=ROLE_NAME, AssumeRolePolicyDocument=assume_policy)
-    iam.attach_role_policy(
-        RoleName=ROLE_NAME,
-        PolicyArn="arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
-    )
-    print(f"  [ok] role '{ROLE_NAME}' created — waiting 15s for IAM propagation...")
-    time.sleep(15)
-    return role["Role"]["Arn"]
+    # Attach VPC policy when deploying into a VPC — idempotent, safe to call repeatedly
+    if use_vpc:
+        try:
+            iam.attach_role_policy(RoleName=ROLE_NAME, PolicyArn=_VPC_POLICY)
+            print(f"  [ok] attached AWSLambdaVPCAccessExecutionRole")
+        except iam.exceptions.EntityAlreadyExistsException:
+            print(f"  [ok] AWSLambdaVPCAccessExecutionRole already attached")
+
+    return role_arn
 
 
 def build_env_vars() -> dict[str, str]:
@@ -63,16 +85,28 @@ def build_env_vars() -> dict[str, str]:
     }
 
 
-def deploy_lambda(lmb: boto3.client, role_arn: str, env_vars: dict[str, str]) -> str:
-    config = {
+def build_vpc_config(vpc: dict) -> dict:
+    return {
+        "SubnetIds": [
+            vpc["subnets"]["private-1a"],
+            vpc["subnets"]["private-1b"],
+        ],
+        "SecurityGroupIds": [vpc["security_groups"]["lambda"]],
+    }
+
+
+def deploy_lambda(lmb, role_arn: str, env_vars: dict[str, str], vpc: dict | None) -> str:
+    config: dict = {
         "Environment": {"Variables": env_vars},
         "Timeout": 60,
         "MemorySize": 512,
     }
+    if vpc:
+        config["VpcConfig"] = build_vpc_config(vpc)
+
     try:
         lmb.get_function(FunctionName=FUNCTION_NAME)
         lmb.update_function_code(FunctionName=FUNCTION_NAME, ImageUri=ECR_IMAGE)
-        # wait for code update to finish before updating config
         waiter = lmb.get_waiter("function_updated_v2")
         waiter.wait(FunctionName=FUNCTION_NAME)
         lmb.update_function_configuration(FunctionName=FUNCTION_NAME, **config)
@@ -95,7 +129,7 @@ def deploy_lambda(lmb: boto3.client, role_arn: str, env_vars: dict[str, str]) ->
     return fn["Configuration"]["FunctionArn"]
 
 
-def deploy_api_gateway(apigw: boto3.client, lmb: boto3.client, fn_arn: str) -> str:
+def deploy_api_gateway(apigw, lmb, fn_arn: str) -> str:
     apis = apigw.get_apis()
     existing = next((a for a in apis["Items"] if a["Name"] == FUNCTION_NAME), None)
     if existing:
@@ -107,7 +141,11 @@ def deploy_api_gateway(apigw: boto3.client, lmb: boto3.client, fn_arn: str) -> s
         ProtocolType="HTTP",
         Target=fn_arn,
         CorsConfiguration={
-            "AllowOrigins": ["https://bridging-data.com", "https://www.bridging-data.com", "http://localhost:3000"],
+            "AllowOrigins": [
+                "https://bridging-data.com",
+                "https://www.bridging-data.com",
+                "http://localhost:3000",
+            ],
             "AllowMethods": ["GET", "POST"],
             "AllowHeaders": ["Content-Type", "Authorization"],
         },
@@ -131,13 +169,16 @@ def main() -> None:
     lmb = boto3.client("lambda", region_name=REGION)
     apigw = boto3.client("apigatewayv2", region_name=REGION)
 
+    print("\n=== Step 0: VPC config ===")
+    vpc = load_vpc_config()
+
     print("\n=== Step 1: IAM execution role ===")
-    role_arn = create_or_get_role(iam)
+    role_arn = create_or_get_role(iam, use_vpc=vpc is not None)
 
     print("\n=== Step 2: Lambda function ===")
     env_vars = build_env_vars()
     try:
-        fn_arn = deploy_lambda(lmb, role_arn, env_vars)
+        fn_arn = deploy_lambda(lmb, role_arn, env_vars, vpc)
     except Exception as exc:
         print(f"  [error] {type(exc).__name__}: {exc}", file=sys.stderr)
         sys.exit(1)
@@ -149,6 +190,12 @@ def main() -> None:
         print(f"  [error] {type(exc).__name__}: {exc}", file=sys.stderr)
         sys.exit(1)
 
+    vpc_note = (
+        f"  VPC:     {vpc['vpc_id']} (private subnets)\n"
+        f"  Subnets: {vpc['subnets']['private-1a']}, {vpc['subnets']['private-1b']}\n"
+        f"  Lambda SG: {vpc['security_groups']['lambda']}"
+    ) if vpc else "  VPC:     none"
+
     print(f"""
 === Deployment complete ===
   Function : {FUNCTION_NAME}
@@ -156,6 +203,7 @@ def main() -> None:
   Health   : {api_url}/health
   Docs     : {api_url}/docs
   Query    : {api_url}/api/v1/query
+{vpc_note}
 """)
 
 

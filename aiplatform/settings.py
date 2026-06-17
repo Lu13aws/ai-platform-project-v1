@@ -110,6 +110,16 @@ class Settings(BaseSettings):
     max_llm_calls_per_run: int = Field(default=100, ge=1)
     max_embedding_calls_per_run: int = Field(default=1000, ge=1)
 
+    # ── Notifications ─────────────────────────────────────────────────────────
+
+    sns_topic_arn: str = ""  # ARN of the radar-notifications SNS topic
+
+    # ── Feature Flags ─────────────────────────────────────────────────────────
+
+    # Set to False for Lambda functions that don't use the LLM (e.g. cleanup)
+    # to skip the production API key validation.
+    require_llm: bool = True
+
     # ── RAG Demo App ──────────────────────────────────────────────────────────
 
     rag_demo_port: int = Field(default=8000, ge=1024, le=65535)
@@ -125,7 +135,7 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_provider_key_in_production(self) -> "Settings":
-        if self.is_production and not self.active_llm_api_key:
+        if self.is_production and self.require_llm and not self.active_llm_api_key:
             raise ValueError(
                 f"API key for provider '{self.llm_provider}' is required in production."
             )

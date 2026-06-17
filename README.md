@@ -15,15 +15,18 @@ ai-platform-project-v1/
 ├── aiplatform/             # Shared platform library (installable Python package)
 │   ├── settings.py         # Pydantic BaseSettings — single source of truth for config
 │   ├── llm/                # LLM provider abstraction (OpenAI + Anthropic, swappable)
-│   ├── storage/            # SQLAlchemy models, async DB engine, S3 wrapper
+│   ├── storage/            # SQLAlchemy models, async DB engine, S3 wrapper, radar models
 │   ├── ingestion/          # Document loaders, chunker, deduplication (hash-based)
 │   ├── retrieval/          # Embedder, pgvector search, hybrid retriever
-│   └── agents/             # Agent base class (Phase 2+)
+│   └── agents/             # CollectorAgent, AnalyzerAgent, ChangeDetectionAgent,
+│                           # ReporterAgent, NotifierAgent, CleanupAgent
 ├── apps/
-│   └── rag_demo/           # Phase 1 — Public RAG Demo FastAPI application
-│       ├── api/            # Routes and Pydantic request/response schemas
-│       ├── services/       # Ingest and query business logic
-│       └── cli.py          # Click CLI for local ingestion runs
+│   ├── rag_demo/           # Phase 1 — Public RAG Demo FastAPI application
+│   │   ├── api/            # Routes, schemas, radar API endpoints
+│   │   ├── services/       # Ingest and query business logic
+│   │   └── cli.py          # Click CLI for local ingestion runs
+│   ├── radar_pipeline/     # Phase 2 — Weekly Lambda handler (EventBridge trigger)
+│   └── cleanup/            # Phase 2 — Monthly cleanup Lambda (retention enforcement)
 ├── migrations/             # Alembic migrations (shared schema, one history)
 │   └── versions/
 ├── research/               # Architecture decisions, dataset notes, feasibility docs
@@ -144,16 +147,22 @@ The `docker/postgres/init.sql` script enables the `vector` and `uuid-ossp` exten
 - Docs: `GET /docs`
 - Query: `POST /api/v1/query`
 - Ingest: `POST /api/v1/ingest`
+- Radar entries: `GET /api/v1/radar/entries?category=Adopt`
+- Latest radar report: `GET /api/v1/radar/report/latest`
 - CORS: `https://bridging-data.com` (production), `*` (development)
-- Lambda: `ai-platform-rag-demo`, 512 MB, 60s timeout, container image
+- Lambda (RAG demo): `ai-platform-rag-demo`, 512 MB, 60s timeout, container image
+- Lambda (radar pipeline): `ai-platform-radar-pipeline`, 512 MB, 300s timeout, weekly EventBridge
+- Lambda (cleanup): `ai-platform-cleanup`, 256 MB, 120s timeout, monthly EventBridge
 - ECR: `759302162548.dkr.ecr.eu-central-1.amazonaws.com/ai-platform-rag-demo:lambda`
 
-**Redeploy after code changes:**
+**Redeploy after code changes (all functions use the same image):**
 ```bash
 docker build -f Dockerfile.lambda -t ai-platform-rag-demo:lambda .
 docker tag ai-platform-rag-demo:lambda 759302162548.dkr.ecr.eu-central-1.amazonaws.com/ai-platform-rag-demo:lambda
 docker push 759302162548.dkr.ecr.eu-central-1.amazonaws.com/ai-platform-rag-demo:lambda
-uv run python scripts/deploy_lambda.py
+uv run python scripts/deploy_lambda.py            # RAG demo API
+uv run python scripts/deploy_radar_pipeline.py   # radar pipeline + EventBridge
+uv run python scripts/deploy_cleanup.py          # cleanup Lambda + EventBridge
 ```
 
 ---
@@ -230,6 +239,16 @@ make type-check         # mypy
 
 All sources are public documents. No personal or confidential data is used in Phase 1.
 
+**Phase 2 — Technology Radar:**
+
+| Source | Type | URL |
+|---|---|---|
+| AWS | RSS + HTML | aws.amazon.com/blogs/aws/ |
+| Databricks | HTML | databricks.com/blog |
+| Anthropic | HTML | anthropic.com/news |
+
+Sources are seeded via `scripts/seed_radar_sources.py`. New sources can be added to the `radar_sources` table.
+
 ---
 
 ## AWS Budget
@@ -285,16 +304,17 @@ Updated `pyproject.toml` (`packages`, `src`, `coverage.source`) and `Makefile` (
 - OpenAI's embedding API has a hard limit of 300,000 tokens per request — batch large document sets into sub-batches of ≤100 chunks to stay within limits
 - The default similarity threshold of 0.75 is too strict for `text-embedding-3-small` on short documents — 0.5 is a more practical starting point for semantic retrieval
 - Windows `Out-File` defaults to UTF-16 LE; use `-Encoding utf8` explicitly when creating test files that Python will later read as UTF-8
+- Long-running DB transactions during HTTP fetches cause silent commit failures — always separate the fetch phase (no session) from the save phase (short session with `flush()` per source)
+- Multiple Lambda functions can share one ECR image using `ImageConfig.Command` override per function — no separate Dockerfiles needed
+- `AWS_REGION`, `AWS_ACCESS_KEY_ID`, and `AWS_SECRET_ACCESS_KEY` are reserved Lambda env vars — passing them explicitly causes `InvalidParameterValueException`; Lambda injects them automatically from the IAM role
+- `asyncio.run()` is valid in Lambda (each invocation is a fresh process) but must never be used inside FastAPI handlers — use `async def` endpoints there
+- Adding sentiment to an existing LLM classification prompt costs nothing extra — extend the JSON response template in the same call
+- SNS `create_topic()` is idempotent; `add_permission()` on Lambda raises `ResourceConflictException` on re-deploy — always catch and continue
+- A snapshot pattern (`UPDATE table SET previous_column = current_column`) before each pipeline run enables cheap change detection: `NULL` previous value means new entry, differing values mean movement
 
 ---
 
 ## Future Improvements
-
-### Phase 2 — Technology Radar
-- Scheduled source collection (EventBridge + Lambda)
-- Relevance classification agent
-- Radar category output (Adopt / Trial / Assess / Hold)
-- Dashboard generation
 
 ### Phase 3 — Private Knowledge Hub
 - Private data separation (app_name scoping already in schema)
@@ -336,6 +356,34 @@ Updated `pyproject.toml` (`packages`, `src`, `coverage.source`) and `Makefile` (
 ---
 
 ## Project Progress
+
+### 20260617 — Phase 2 complete: Technology Radar pipeline live on AWS
+
+**Completed:**
+- Multi-agent pipeline deployed to AWS Lambda (weekly EventBridge schedule, Monday 06:00 UTC):
+  - **CollectorAgent** — RSS + HTML fetching (AWS, Databricks, Anthropic), URL deduplication, two-phase fetch/save to avoid long DB transactions
+  - **AnalyzerAgent** — LLM classification into Adopt/Trial/Assess/Hold with sentiment (positive/neutral/negative), hard stop at `MAX_LLM_CALLS_PER_RUN`
+  - **ChangeDetectionAgent** — snapshot pattern (`previous_category`), detects new technologies and category movements (up/down)
+  - **ReporterAgent** — generates JSON + dark-themed HTML report, uploads to S3 (`radar/reports/YYYY/MM/`), inserts `radar_reports` DB record
+  - **NotifierAgent** — SNS email with pipeline summary and change list (subject: "3 changes detected | 50 technologies tracked")
+- **CleanupAgent** deployed on separate monthly Lambda (1st of month, 03:00 UTC):
+  - Deletes `raw_articles` older than 90 days
+  - Deletes `radar_reports` older than 24 months (JSON + HTML from S3 + DB row)
+- Radar API endpoints added to RAG demo FastAPI app:
+  - `GET /api/v1/radar/entries?category=Adopt` — returns entries grouped by category
+  - `GET /api/v1/radar/report/latest` — returns latest report metadata
+- Alembic migrations: `radar_entries.previous_category`, `radar_signals.sentiment`
+- Single ECR image, three Lambda functions with different `ImageConfig.Command` overrides
+- SNS topic + email subscription configured (`scripts/setup_sns.py`)
+- 50+ technologies tracked across 3 monitored sources
+
+**Fixed during implementation:**
+- Collector inserting 0 articles: DB transaction held open during HTTP requests caused commit failure — fixed with two-phase approach (all HTTP first, then short DB session)
+- Reserved Lambda env vars (`AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`) caused `InvalidParameterValueException` — removed from all deploy scripts
+- Non-LLM Lambda failing settings validation: added `REQUIRE_LLM=false` feature flag to skip API key check for cleanup Lambda
+- `ensure_role()` return value bug in `deploy_cleanup.py` — fixed `role_arn` variable scope
+
+---
 
 ### 20260616 — Phase 1 deployed to AWS
 
