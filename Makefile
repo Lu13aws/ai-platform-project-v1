@@ -1,7 +1,7 @@
 .PHONY: help install install-dev lint format type-check check test test-unit \
         test-integration test-e2e test-fast dev-up dev-up-tools dev-down \
         dev-reset dev-logs db-shell migrate migrate-new migrate-down \
-        migrate-history migrate-current run-rag-demo ingest clean env-check
+        migrate-history migrate-current run-rag-demo run-private-hub ingest clean env-check
 
 PYTHON := uv run python
 UV     := uv
@@ -91,6 +91,9 @@ migrate-current: ## Show current DB schema version
 
 run-rag-demo: ## Start the RAG Demo API server with hot reload
 	$(UV) run uvicorn apps.rag_demo.main:app --reload --port 8000 --host 0.0.0.0
+
+run-private-hub: ## Start the Private Knowledge Hub on localhost:8001 (local only)
+	$(UV) run uvicorn apps.private_hub.main:app --reload --port 8001 --host 127.0.0.1
 
 ingest: ## Ingest documents (usage: make ingest PATH=./docs/myfile.pdf)
 	$(UV) run rag-demo ingest --path "$(PATH)"

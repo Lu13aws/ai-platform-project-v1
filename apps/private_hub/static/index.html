@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Private Knowledge Hub</title>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0f172a; color: #e2e8f0; min-height: 100vh;
+      display: grid; grid-template-columns: 300px 1fr; grid-template-rows: auto 1fr;
+    }
+
+    /* ── Header ── */
+    header {
+      grid-column: 1 / -1;
+      background: #1e293b; border-bottom: 1px solid #334155;
+      padding: 16px 28px; display: flex; align-items: center; justify-content: space-between;
+    }
+    header h1 { font-size: 1.1rem; font-weight: 600; color: #f1f5f9; }
+    header h1 span { color: #38bdf8; }
+    #stats-bar { font-size: 0.75rem; color: #64748b; display: flex; gap: 20px; }
+    #stats-bar b { color: #94a3b8; }
+
+    /* ── Sidebar ── */
+    aside {
+      background: #1e293b; border-right: 1px solid #334155;
+      padding: 20px 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 20px;
+    }
+
+    .panel-title { font-size: 0.7rem; font-weight: 600; text-transform: uppercase;
+                   letter-spacing: 0.08em; color: #475569; margin-bottom: 10px; }
+
+    /* Ingest form */
+    #ingest-path {
+      width: 100%; background: #0f172a; border: 1px solid #334155; border-radius: 6px;
+      padding: 8px 10px; color: #e2e8f0; font-size: 0.8rem; resize: vertical; min-height: 70px;
+    }
+    #ingest-path:focus { outline: none; border-color: #38bdf8; }
+
+    .btn {
+      width: 100%; padding: 8px 12px; border: none; border-radius: 6px;
+      font-size: 0.8rem; font-weight: 600; cursor: pointer; transition: opacity 0.15s;
+    }
+    .btn:hover { opacity: 0.85; }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn-primary { background: #0ea5e9; color: #fff; }
+    .btn-secondary { background: #334155; color: #cbd5e1; }
+
+    #ingest-result {
+      font-size: 0.75rem; color: #94a3b8; margin-top: 8px;
+      min-height: 18px; line-height: 1.5;
+    }
+    #ingest-result.error { color: #f87171; }
+    #ingest-result.success { color: #4ade80; }
+
+    /* Sources list */
+    #sources-list { font-size: 0.75rem; color: #94a3b8; line-height: 1.8; overflow-y: auto; max-height: 300px; }
+    #sources-list .src { display: flex; align-items: flex-start; gap: 6px; padding: 3px 0;
+                          border-bottom: 1px solid #1e293b; }
+    #sources-list .src-icon { font-size: 0.65rem; margin-top: 2px; color: #475569; }
+    #sources-list .src-name { color: #cbd5e1; word-break: break-all; flex: 1; }
+    #sources-list .src-parent { color: #475569; }
+    #sources-list .src-del { background: none; border: none; color: #334155; cursor: pointer;
+                              font-size: 0.75rem; padding: 0 2px; line-height: 1; flex-shrink: 0; }
+    #sources-list .src-del:hover { color: #f87171; }
+    #no-sources { color: #334155; font-style: italic; }
+
+    /* ── Main ── */
+    main { padding: 28px 32px; display: flex; flex-direction: column; gap: 20px; overflow-y: auto; }
+
+    /* Query form */
+    #query-form { display: flex; gap: 10px; }
+    #question {
+      flex: 1; background: #1e293b; border: 1px solid #334155; border-radius: 8px;
+      padding: 12px 16px; color: #e2e8f0; font-size: 0.9rem;
+    }
+    #question:focus { outline: none; border-color: #38bdf8; }
+    #ask-btn { padding: 12px 20px; white-space: nowrap; border-radius: 8px;
+               background: #0ea5e9; color: #fff; border: none; font-weight: 600;
+               font-size: 0.85rem; cursor: pointer; }
+    #ask-btn:hover { background: #0284c7; }
+    #ask-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* Answer */
+    #answer-section { display: none; flex-direction: column; gap: 16px; }
+
+    .answer-card {
+      background: #1e293b; border: 1px solid #334155; border-radius: 10px; padding: 20px;
+    }
+    .answer-card h3 { font-size: 0.7rem; font-weight: 600; text-transform: uppercase;
+                      letter-spacing: 0.08em; color: #475569; margin-bottom: 12px; }
+    #answer-text { font-size: 0.9rem; color: #e2e8f0; line-height: 1.7; }
+
+    .sources-grid { display: flex; flex-direction: column; gap: 8px; }
+    .source-chip {
+      background: #0f172a; border: 1px solid #334155; border-radius: 6px;
+      padding: 10px 14px; font-size: 0.78rem;
+    }
+    .source-chip .sc-header { display: flex; justify-content: space-between;
+                               align-items: center; margin-bottom: 5px; }
+    .source-chip .sc-label { font-weight: 600; color: #38bdf8; }
+    .source-chip .sc-score { font-size: 0.7rem; color: #475569; }
+    .source-chip .sc-path { font-size: 0.72rem; color: #64748b; margin-bottom: 6px;
+                             word-break: break-all; }
+    .source-chip .sc-excerpt { font-size: 0.78rem; color: #94a3b8; line-height: 1.5; }
+
+    .meta-row { font-size: 0.72rem; color: #475569; }
+
+    /* Markdown rendered inside answer card */
+    #answer-text h1, #answer-text h2, #answer-text h3 {
+      color: #f1f5f9; font-weight: 600; margin: 14px 0 6px;
+    }
+    #answer-text h1 { font-size: 1rem; }
+    #answer-text h2 { font-size: 0.95rem; }
+    #answer-text h3 { font-size: 0.88rem; color: #94a3b8; }
+    #answer-text p { margin: 6px 0; }
+    #answer-text ul, #answer-text ol { padding-left: 20px; margin: 6px 0; }
+    #answer-text li { margin: 3px 0; }
+    #answer-text code { background: #0f172a; border-radius: 4px; padding: 1px 5px;
+                        font-size: 0.82rem; color: #7dd3fc; font-family: monospace; }
+    #answer-text pre { background: #0f172a; border-radius: 6px; padding: 12px;
+                       overflow-x: auto; margin: 10px 0; }
+    #answer-text pre code { background: none; padding: 0; color: #e2e8f0; }
+    #answer-text strong { color: #f1f5f9; }
+    #answer-text a { color: #38bdf8; text-decoration: none; }
+    #answer-text table { border-collapse: collapse; width: 100%; margin: 10px 0; font-size: 0.82rem; }
+    #answer-text th, #answer-text td { border: 1px solid #334155; padding: 6px 10px; text-align: left; }
+    #answer-text th { background: #1e293b; color: #94a3b8; }
+
+    /* Loading spinner */
+    .spinner { display: inline-block; width: 14px; height: 14px;
+               border: 2px solid #334155; border-top-color: #38bdf8;
+               border-radius: 50%; animation: spin 0.6s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>🔒 <span>Private</span> Knowledge Hub</h1>
+  <div id="stats-bar">
+    <span><b id="doc-count">—</b> documents</span>
+    <span><b id="provider-label">—</b></span>
+    <span style="color:#22c55e">● local only</span>
+  </div>
+</header>
+
+<aside>
+  <!-- Ingest panel -->
+  <div>
+    <p class="panel-title">Ingest Folder</p>
+    <textarea id="ingest-path" placeholder="C:\Users\lucia\OneDrive\Dokumente\private-knowledge-hub"></textarea>
+    <button class="btn btn-primary" id="ingest-btn" style="margin-top:8px">Ingest Documents</button>
+    <button class="btn btn-secondary" id="refresh-btn" style="margin-top:6px">Refresh Sources</button>
+    <p id="ingest-result"></p>
+  </div>
+
+  <!-- Sources panel -->
+  <div>
+    <p class="panel-title">Indexed Sources</p>
+    <div id="sources-list"><span id="no-sources">No documents indexed yet.</span></div>
+  </div>
+</aside>
+
+<main>
+  <div id="query-form">
+    <input id="question" type="text"
+           placeholder="Ask anything about your documents… e.g. How did I configure pgvector on RDS?" />
+    <button id="ask-btn">Ask</button>
+  </div>
+
+  <div id="answer-section">
+    <div class="answer-card">
+      <h3>Answer</h3>
+      <p id="answer-text"></p>
+    </div>
+    <div class="answer-card">
+      <h3>Sources</h3>
+      <div id="sources-grid" class="sources-grid"></div>
+    </div>
+    <p class="meta-row" id="meta-row"></p>
+  </div>
+</main>
+
+<script>
+  const API = 'http://localhost:8001';
+
+  async function loadStats() {
+    try {
+      const r = await fetch(`${API}/stats`);
+      const d = await r.json();
+      document.getElementById('doc-count').textContent = d.document_count;
+      document.getElementById('provider-label').textContent = `${d.llm_provider} / ${d.llm_model}`;
+    } catch { /* server not ready yet */ }
+  }
+
+  async function loadSources() {
+    try {
+      const r = await fetch(`${API}/sources`);
+      const d = await r.json();
+      const el = document.getElementById('sources-list');
+      if (d.total === 0) {
+        el.innerHTML = '<span id="no-sources">No documents indexed yet.</span>';
+        return;
+      }
+      el.innerHTML = d.documents.map(doc => {
+        const parts = doc.source_uri.split(/[\\/]/);
+        const name = parts.pop();
+        const parent = parts.length > 0 ? parts.pop() : '';
+        const label = parent ? `<span class="src-parent">${esc(parent)}/</span>${esc(name)}` : esc(name);
+        const icon = iconFor(doc.mime_type);
+        return `<div class="src">
+          <span class="src-icon">${icon}</span>
+          <span class="src-name" title="${esc(doc.source_uri)}">${label}</span>
+          <button class="src-del" data-id="${esc(doc.document_id)}" title="Remove from index">×</button>
+        </div>`;
+      }).join('');
+    } catch { /* ignore */ }
+  }
+
+  function iconFor(mime) {
+    if (!mime) return '📄';
+    if (mime.includes('pdf')) return '📕';
+    if (mime.includes('word')) return '📘';
+    if (mime.includes('excel') || mime.includes('spreadsheet')) return '📗';
+    if (mime.includes('markdown')) return '📝';
+    if (mime.includes('html')) return '🌐';
+    return '📄';
+  }
+
+  document.getElementById('ingest-btn').addEventListener('click', async () => {
+    const raw = document.getElementById('ingest-path').value.trim();
+    if (!raw) return;
+    const paths = raw.split('\n').map(p => p.trim()).filter(Boolean);
+    const btn = document.getElementById('ingest-btn');
+    const result = document.getElementById('ingest-result');
+
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>';
+    result.className = '';
+    result.textContent = 'Ingesting…';
+
+    try {
+      const r = await fetch(`${API}/ingest`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ paths }),
+      });
+      const d = await r.json();
+      if (d.errors && d.errors.length > 0) {
+        result.className = 'error';
+        result.textContent = `⚠ ${d.errors[0]}`;
+      } else {
+        result.className = 'success';
+        result.textContent = `✓ ${d.ingested} ingested · ${d.skipped} unchanged · ${d.unsupported} unsupported`;
+      }
+      await loadStats();
+      await loadSources();
+    } catch (e) {
+      result.className = 'error';
+      result.textContent = `Error: ${e.message}`;
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Ingest Documents';
+    }
+  });
+
+  document.getElementById('sources-list').addEventListener('click', async (e) => {
+    const btn = e.target.closest('.src-del');
+    if (!btn) return;
+    const id = btn.dataset.id;
+    const name = btn.closest('.src').querySelector('.src-name').textContent;
+    if (!confirm(`Remove "${name}" from the index?\n\nThe file itself is not deleted.`)) return;
+    btn.disabled = true;
+    try {
+      const r = await fetch(`${API}/sources/${id}`, { method: 'DELETE' });
+      if (!r.ok) throw new Error(await r.text());
+      await loadStats();
+      await loadSources();
+    } catch (e) {
+      alert(`Failed to remove: ${e.message}`);
+      btn.disabled = false;
+    }
+  });
+
+  document.getElementById('refresh-btn').addEventListener('click', async () => {
+    await loadStats();
+    await loadSources();
+  });
+
+  async function ask() {
+    const q = document.getElementById('question').value.trim();
+    if (!q) return;
+
+    const btn = document.getElementById('ask-btn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>';
+
+    const section = document.getElementById('answer-section');
+    section.style.display = 'none';
+
+    try {
+      const r = await fetch(`${API}/query`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question: q, top_k: 5 }),
+      });
+      const d = await r.json();
+
+      document.getElementById('answer-text').innerHTML = marked.parse(d.answer);
+
+      const grid = document.getElementById('sources-grid');
+      grid.innerHTML = d.sources.map((s, i) => `
+        <div class="source-chip">
+          <div class="sc-header">
+            <span class="sc-label">[${i + 1}]</span>
+            <span class="sc-score">score: ${s.score}</span>
+          </div>
+          <div class="sc-path">${esc(s.source_uri)}</div>
+          <div class="sc-excerpt">${esc(s.excerpt)}</div>
+        </div>`).join('');
+
+      document.getElementById('meta-row').textContent =
+        `Model: ${d.model} · ${d.input_tokens} in / ${d.output_tokens} out tokens`;
+
+      section.style.display = 'flex';
+    } catch (e) {
+      document.getElementById('answer-text').textContent = `Error: ${e.message}`;
+      section.style.display = 'flex';
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Ask';
+    }
+  }
+
+  document.getElementById('ask-btn').addEventListener('click', ask);
+  document.getElementById('question').addEventListener('keydown', e => {
+    if (e.key === 'Enter') ask();
+  });
+
+  function esc(str) {
+    return String(str ?? '')
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  // Init
+  loadStats();
+  loadSources();
+</script>
+</body>
+</html>

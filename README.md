@@ -26,7 +26,12 @@ ai-platform-project-v1/
 │   │   ├── services/       # Ingest and query business logic
 │   │   └── cli.py          # Click CLI for local ingestion runs
 │   ├── radar_pipeline/     # Phase 2 — Weekly Lambda handler (EventBridge trigger)
-│   └── cleanup/            # Phase 2 — Monthly cleanup Lambda (retention enforcement)
+│   ├── cleanup/            # Phase 2 — Monthly cleanup Lambda (retention enforcement)
+│   └── private_hub/        # Phase 3 — Private Knowledge Hub (local only, localhost:8001)
+│       ├── main.py         # FastAPI app: ingest, query, sources, stats, delete, UI
+│       ├── ingester.py     # FolderIngester: recursive walk, exclusions, 50 MB cap
+│       └── static/
+│           └── index.html  # Dark-themed single-page UI with markdown rendering
 ├── migrations/             # Alembic migrations (shared schema, one history)
 │   └── versions/
 ├── research/               # Architecture decisions, dataset notes, feasibility docs
@@ -83,7 +88,7 @@ Client (bridging-data.com / CLI)
 | Embeddings | OpenAI text-embedding-3-small |
 | LLM (chat) | OpenAI gpt-4o-mini / Anthropic Claude (swappable) |
 | Chunking | langchain-text-splitters RecursiveCharacterTextSplitter |
-| Document loaders | pypdf, python-docx, beautifulsoup4, lxml |
+| Document loaders | pypdf, python-docx, beautifulsoup4, lxml, openpyxl — 18 formats: PDF, DOCX, TXT, MD, HTML, CSV, JSON, XLSX, PY, TS, JS, SQL, YAML, TOML, SH, TF |
 | Infrastructure | AWS Lambda or ECS, RDS, API Gateway, CloudFront |
 | CI/CD | GitHub Actions |
 | Local dev | Docker Compose (pgvector/pgvector:pg16) |
@@ -322,11 +327,6 @@ Updated `pyproject.toml` (`packages`, `src`, `coverage.source`) and `Makefile` (
 
 ## Future Improvements
 
-### Phase 3 — Private Knowledge Hub
-- Private data separation (app_name scoping already in schema)
-- No public API exposure
-- Privacy-aware logging
-
 ### Phase 4 — Regulatory Radar
 - Version-aware document processing
 - Change detection and diff summaries
@@ -362,6 +362,39 @@ Updated `pyproject.toml` (`packages`, `src`, `coverage.source`) and `Makefile` (
 ---
 
 ## Project Progress
+
+### 20260618 — Phase 3 complete: Private Knowledge Hub running locally
+
+**Completed:**
+- `apps/private_hub/` — standalone FastAPI application on `localhost:8001`, completely isolated from the public RAG demo
+- `FolderIngester` — recursive folder walk with 15 excluded directory patterns, 7 excluded filenames, 50 MB file cap, `IngestResult` dataclass
+- Single-file and directory path support: `run()` dispatches to `_ingest_file()` or `_walk()` based on `is_file()` check
+- `app_name="private_hub"` scoping — all documents, chunks, and embeddings stored with private hub scope, never returned by public API
+- `MarkdownLoader` with `_strip_markdown()` — 13-step regex pipeline strips headers, bold/italic, tables, list markers, blockquotes while preserving all content; registered before `TextLoader` in loader chain
+- `similarity_threshold=0.25` for private hub queries — personal markdown documents score 0.23–0.33 vs 0.40+ for prose PDFs; lower threshold required for meaningful retrieval
+- 18 supported file types: PDF, DOCX, TXT, MD, HTML, HTM, CSV, JSON, XLSX, PY, TS, JS, SQL, YAML, YML, TOML, SH, TF
+- `DELETE /sources/{document_id}` endpoint — cascade deletes chunks and embeddings via ORM relationship
+- Dark-themed single-page UI (`static/index.html`):
+  - Folder ingest panel with multi-path support (newline-separated)
+  - Indexed sources list with parent/filename display and × delete button per source
+  - Markdown rendering via `marked.js` — answers display with proper headings, lists, code blocks, tables
+  - Token usage and model info in footer
+- All endpoints use `async with get_async_session() as session:` directly (not `Depends`) — reliable commits
+- 65+ personal documents indexed: CLAUDE.md files, README files, SKILL.md files from multiple projects
+
+**Fixed during implementation:**
+- `TypeError: '_AsyncGeneratorContextManager' object is not an async iterator` — `@asynccontextmanager`-decorated function cannot be used with FastAPI `Depends()` — switched all endpoints to direct context manager usage
+- Zero search results despite successful ingest — similarity threshold 0.5 filtered out all markdown documents scoring 0.23–0.33; set private hub threshold to 0.25
+- `NotADirectoryError` on single file paths — `_walk()` called `iterdir()` unconditionally; fixed with `is_file()` check in `run()`
+- Raw markdown symbols (`###`, `**`) in answers — UI used `textContent`; switched to `marked.js` with `innerHTML = marked.parse(d.answer)`
+- DB diagnostics running against local Docker instead of AWS RDS — app connects to RDS via `DATABASE_URL` in `.env`
+
+**Start private hub:**
+```bash
+uv run uvicorn apps.private_hub.main:app --reload --port 8001 --host 127.0.0.1
+```
+
+---
 
 ### 20260617 — Phase 2 complete: Technology Radar pipeline live on AWS
 

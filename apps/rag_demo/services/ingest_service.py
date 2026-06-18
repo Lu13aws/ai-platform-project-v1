@@ -15,12 +15,10 @@ from aiplatform.retrieval.embedder import Embedder
 from aiplatform.storage.models import Chunk, Document, Embedding
 from apps.rag_demo.api.schemas import IngestRequest, IngestResponse
 
-APP_NAME = "rag_demo"
-
-
 class IngestService:
-    def __init__(self, session: AsyncSession) -> None:
+    def __init__(self, session: AsyncSession, app_name: str = "rag_demo") -> None:
         self._session = session
+        self._app_name = app_name
 
     async def ingest(self, request: IngestRequest) -> IngestResponse:
         # 1. Load document from source
@@ -82,7 +80,7 @@ class IngestService:
             title=request.title or loaded_doc.metadata.get("filename"),
             mime_type=loaded_doc.mime_type,
             doc_metadata=merged_metadata,
-            app_name=APP_NAME,
+            app_name=self._app_name,
         )
         self._session.add(document)
         await self._session.flush()  # resolve document PK before FK references

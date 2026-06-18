@@ -103,7 +103,7 @@ class Settings(BaseSettings):
     # ── Retrieval ─────────────────────────────────────────────────────────────
 
     retrieval_top_k: int = Field(default=5, ge=1, le=50)
-    retrieval_similarity_threshold: float = Field(default=0.75, ge=0.0, le=1.0)
+    retrieval_similarity_threshold: float = Field(default=0.50, ge=0.0, le=1.0)
 
     # ── Cost Controls ─────────────────────────────────────────────────────────
 

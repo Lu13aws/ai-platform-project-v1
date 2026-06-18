@@ -9,8 +9,6 @@ from aiplatform.retrieval.embedder import Embedder
 from aiplatform.retrieval.vector_store import VectorStore
 from apps.rag_demo.api.schemas import QueryRequest, QueryResponse, SourceReference
 
-APP_NAME = "rag_demo"
-
 _RAG_SYSTEM_PROMPT = """\
 You are a knowledgeable assistant that answers questions using only the provided context.
 Cite your sources by referencing the [1], [2], etc. labels in your response.
@@ -20,8 +18,17 @@ say so clearly — do not speculate or invent information.\
 
 
 class QueryService:
-    def __init__(self, session: AsyncSession) -> None:
+    def __init__(
+        self,
+        session: AsyncSession,
+        app_name: str = "rag_demo",
+        system_prompt: str = _RAG_SYSTEM_PROMPT,
+        similarity_threshold: float | None = None,
+    ) -> None:
         self._session = session
+        self._app_name = app_name
+        self._system_prompt = system_prompt
+        self._similarity_threshold = similarity_threshold
 
     async def query(self, request: QueryRequest) -> QueryResponse:
         provider = get_llm_provider()
@@ -35,7 +42,8 @@ class QueryService:
         results = await store.search(
             query_embedding.vector,
             top_k=request.top_k,
-            app_name=APP_NAME,
+            app_name=self._app_name,
+            similarity_threshold=self._similarity_threshold,
         )
 
         # 3. Short-circuit if nothing was found — don't waste an LLM call
@@ -65,7 +73,7 @@ class QueryService:
                 content=f"Context:\n{context}\n\nQuestion: {request.question}",
             ),
         ]
-        llm_response = await provider.complete(messages, system_prompt=_RAG_SYSTEM_PROMPT)
+        llm_response = await provider.complete(messages, system_prompt=self._system_prompt)
 
         # 6. Build source references (truncate excerpt to keep response lean)
         sources = [
