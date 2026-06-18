@@ -51,8 +51,14 @@ ai-platform-project-v1/
 
 ## Final Architecture
 
+### Diagramms Phase 1 - Public RAG Demo
+
 https://miro.com/app/board/uXjVHErgZ40=/?moveToWidget=3458764675722816283&cot=14
 https://miro.com/app/board/uXjVHErgZ40=/?moveToWidget=3458764675724444499&cot=14
+
+### Diagramms Phase 2 - Technology Radar
+
+https://miro.com/app/board/uXjVHErgZ40=/?moveToWidget=3458764675869493800&cot=14
 
 ```
 Client (bridging-data.com / CLI)
