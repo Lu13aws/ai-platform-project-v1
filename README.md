@@ -65,6 +65,10 @@ https://miro.com/app/board/uXjVHErgZ40=/?moveToWidget=3458764675724444499&cot=14
 
 https://miro.com/app/board/uXjVHErgZ40=/?moveToWidget=3458764675869493800&cot=14
 
+### Diagramms Phase 3 - Private Knowledge Hub
+
+https://miro.com/app/board/uXjVHErgZ40=/?moveToWidget=3458764675971998867&cot=14
+
 ```
 Client (bridging-data.com / CLI)
 → AWS API Gateway

@@ -2,8 +2,11 @@
 Cleanup Agent — enforces data retention policies.
 
 Retention rules (from CLAUDE.md):
-  raw_articles   : 30 days  (expires_at column set on insert)
-  radar_reports  : 24 months (generated_at < cutoff → delete S3 + DB row)
+  raw_articles         : 30 days  (expires_at column set on insert)
+  radar_reports        : 24 months (generated_at < cutoff → delete S3 + DB row)
+  regulatory_reports   : 24 months (generated_at < cutoff → delete S3 JSON/HTML + DB row)
+  regulatory_documents : KEEP — version history required for historical comparison
+  regulatory_changes   : KEEP — report_id set to NULL on report delete, changes retained
 
 Runs monthly via EventBridge. Safe to re-run at any time.
 """
@@ -15,6 +18,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from aiplatform.storage.radar_models import RadarReport, RawArticle
+from aiplatform.storage.regulatory_models import RegulatoryReport
 from aiplatform.storage.s3 import S3Client
 
 _REPORT_RETENTION_MONTHS = 24
@@ -24,6 +28,7 @@ _REPORT_RETENTION_MONTHS = 24
 class CleanupResult:
     articles_deleted: int = 0
     reports_deleted: int = 0
+    regulatory_reports_deleted: int = 0
     s3_objects_deleted: int = 0
     errors: list[str] = None  # type: ignore[assignment]
 
@@ -35,6 +40,7 @@ class CleanupResult:
         return (
             f"articles_deleted={self.articles_deleted} "
             f"reports_deleted={self.reports_deleted} "
+            f"regulatory_reports_deleted={self.regulatory_reports_deleted} "
             f"s3_deleted={self.s3_objects_deleted} "
             f"errors={len(self.errors)}"
         )
@@ -49,6 +55,7 @@ class CleanupAgent:
 
         await self._delete_expired_articles(session, result)
         await self._delete_old_reports(session, result)
+        await self._delete_old_regulatory_reports(session, result)
 
         return result
 
@@ -86,6 +93,40 @@ class CleanupAgent:
             result.reports_deleted += 1
 
         print(f"  [cleanup] radar_reports deleted: {result.reports_deleted}")
+
+    async def _delete_old_regulatory_reports(
+        self, session: AsyncSession, result: CleanupResult
+    ) -> None:
+        """Delete regulatory_reports older than 24 months + their S3 JSON/HTML files.
+
+        regulatory_changes linked to deleted reports have report_id SET NULL — they
+        are retained permanently for historical reference (per CLAUDE.md retention rules).
+        regulatory_documents (version history) are never deleted automatically.
+        """
+        cutoff = datetime.now(UTC) - timedelta(days=_REPORT_RETENTION_MONTHS * 30)
+
+        old_reports = (
+            await session.scalars(
+                select(RegulatoryReport).where(RegulatoryReport.generated_at < cutoff)
+            )
+        ).all()
+
+        print(f"  [cleanup] old regulatory_reports found: {len(old_reports)}")
+
+        for report in old_reports:
+            for key in [k for k in [report.s3_key_json, report.s3_key_html] if k]:
+                try:
+                    await self._s3.delete(key)
+                    result.s3_objects_deleted += 1
+                    print(f"  [cleanup] s3 deleted: {key}")
+                except Exception as exc:
+                    result.errors.append(f"s3 delete {key}: {exc}")
+                    print(f"  [cleanup] s3 delete failed: {key}: {exc}")
+
+            await session.delete(report)
+            result.regulatory_reports_deleted += 1
+
+        print(f"  [cleanup] regulatory_reports deleted: {result.regulatory_reports_deleted}")
 
 
 def _derive_s3_keys(json_key: str) -> list[str]:
