@@ -329,6 +329,157 @@ Updated `pyproject.toml` (`packages`, `src`, `coverage.source`) and `Makefile` (
 
 ---
 
+## Competitor Radar — Operations Guide
+
+> This section documents how the Competitor Radar pipeline works and how to maintain it.
+> It is intentionally detailed so it can be ingested into the Private Knowledge Hub
+> and queried later: *"How do I add a new company to the Competitor Radar?"*
+
+### Pipeline Overview
+
+The Competitor Radar runs every **Monday at 08:00 UTC** via AWS Lambda + EventBridge.
+
+```
+Phase 1: CompetitorCollectorAgent   — fetch articles, pricing diffs, stock moves, HN posts
+Phase 2: CompetitorAnalyzerAgent    — LLM classifies each article (signal type, impact, sentiment)
+Phase 3: CompetitorReporterAgent    — HTML + JSON report → S3, also writes latest.html
+Phase 4: CompetitorNotifierAgent    — SNS email notification
+```
+
+Each phase runs in its own DB session. Failures in later phases do not roll back earlier work.
+
+---
+
+### Companies & Sources
+
+| Company | Blog / RSS | Pricing | Financial | Community (HN) |
+|---|---|---|---|---|
+| OpenAI | openai.com/blog/rss.xml | openai.com/api/pricing ⚠️ 403 | — | `hn://OpenAI` |
+| Anthropic | anthropic.com/news | anthropic.com/pricing | — | `hn://Anthropic` |
+| Microsoft | azure.microsoft.com/blog/feed/ | azure.microsoft.com/en-us/pricing/... | MSFT | `hn://Microsoft Copilot` |
+| AWS | aws.amazon.com/blogs/machine-learning/feed/ | aws.amazon.com/bedrock/pricing/ | AMZN | `hn://Amazon Bedrock` |
+| Google | cloud.google.com/blog/products/ai-machine-learning/rss/ | cloud.google.com/vertex-ai/... | GOOGL | `hn://Google Gemini` |
+| Mistral AI | mistral.ai/news | mistral.ai/technology | — | `hn://Mistral AI` |
+
+⚠️ OpenAI pricing page returns 403 — no workaround without authentication. Monitor manually.
+
+**URL schemes used in the DB:**
+- `https://...` — real URL for blog feeds and pricing pages
+- `yahoo://TICKER` — financial source (collector strips prefix, queries Yahoo Finance)
+- `hn://keyword` — HN Algolia search term (collector strips prefix, searches HN)
+
+---
+
+### Signal Types
+
+| signal_type | Source | LLM? | Trigger |
+|---|---|---|---|
+| `product_announcement` | blog, community | Yes | Classified by LLM |
+| `pricing_change` | pricing | **No** | HTML hash differs from last fetch |
+| `financial_update` | financial | **No** | Weekly stock move > 5% |
+| `sentiment_event` | blog, community | Yes | Classified by LLM |
+
+---
+
+### Adding a New Company
+
+1. Add source rows to the DB (or add to `scripts/seed_competitor_sources.py` and re-run):
+
+```python
+# For a blog:
+CompetitorSource(company_name="New Co", name="New Co Blog",
+    url="https://newco.com/rss.xml", source_type="blog", active=True)
+
+# For a pricing page:
+CompetitorSource(company_name="New Co", name="New Co Pricing",
+    url="https://newco.com/pricing", source_type="pricing", active=True)
+
+# For a public company stock:
+CompetitorSource(company_name="New Co", name="NCO Stock",
+    url="yahoo://NCO", source_type="financial", active=True)
+
+# For HN community sentiment:
+CompetitorSource(company_name="New Co", name="HN: New Co",
+    url="hn://New Company", source_type="community", active=True)
+```
+
+2. Next Monday's run will pick up the new sources automatically.
+
+---
+
+### Disabling a Source
+
+Set `active=False` on the source row to stop collecting from it without deleting the signal history:
+
+```sql
+UPDATE competitor_sources SET active = false WHERE name = 'OpenAI Pricing';
+```
+
+---
+
+### Manually Triggering a Run
+
+```bash
+aws lambda invoke \
+  --function-name ai-platform-competitor-pipeline \
+  --region eu-central-1 \
+  /tmp/competitor_out.json && cat /tmp/competitor_out.json
+```
+
+---
+
+### S3 Structure
+
+```
+s3://ai-platform-documents-dev/
+└── competitor/
+    ├── raw/YYYY/MM/{company-slug}/{hash}.html   ← pricing page HTML snapshots
+    └── reports/
+        ├── YYYY/MM/competitor_YYYYMMDD_HHMMSS.html  ← timestamped report
+        ├── YYYY/MM/competitor_YYYYMMDD_HHMMSS.json  ← timestamped JSON
+        ├── latest.html                              ← always the most recent run
+        └── latest.json                              ← always the most recent run
+```
+
+`latest.html` and `latest.json` are overwritten on every run — used for stable portfolio embedding.
+
+---
+
+### Retention Rules
+
+| Data | Retention | Mechanism |
+|---|---|---|
+| `competitor_raw_content` | 30 days | `expires_at` column → `CleanupAgent` (monthly Lambda) |
+| `competitor_signals` | 12 months | `expires_at` column → `CleanupAgent` |
+| `competitor_reports` (DB + S3) | 12 months | `generated_at` cutoff → `CleanupAgent` |
+| S3 pricing snapshots (`raw/`) | 30 days | Same as raw content |
+
+---
+
+### Lambda & EventBridge Details
+
+| Property | Value |
+|---|---|
+| Function name | `ai-platform-competitor-pipeline` |
+| ECR image | `ai-platform-rag-demo:lambda` (shared image) |
+| Handler | `apps.competitor_pipeline.lambda_handler.handler` |
+| Schedule | `cron(0 8 ? * MON *)` — Monday 08:00 UTC |
+| Timeout | 300s |
+| Memory | 512 MB |
+| VPC | Private subnets (RDS access required) |
+
+Re-deploy after code changes:
+
+```bash
+# 1. Rebuild and push the Docker image
+uv run python scripts/build_and_push.py
+
+# 2. Update the Lambda function
+uv run python scripts/deploy_competitor_pipeline.py
+```
+
+---
+
 ## Regulatory Radar — Operations Guide
 
 > This section documents how the Regulatory Radar pipeline works and how to maintain it.

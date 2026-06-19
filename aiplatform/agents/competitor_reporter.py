@@ -26,6 +26,8 @@ from aiplatform.storage.competitor_models import (
 from aiplatform.storage.s3 import S3Client
 
 _REPORT_PREFIX = "competitor/reports"
+_LATEST_HTML_KEY = "competitor/reports/latest.html"
+_LATEST_JSON_KEY = "competitor/reports/latest.json"
 _SCHEMA_VERSION = 1
 
 _IMPACT_COLORS = {"High": "#ef4444", "Medium": "#f59e0b", "Low": "#22c55e"}
@@ -148,6 +150,11 @@ class CompetitorReporterAgent:
         html_bytes = _render_html(report).encode("utf-8")
         result.html_s3_uri = await self._s3.upload(html_key, html_bytes, "text/html; charset=utf-8")
         print(f"  [s3] {result.html_s3_uri}")
+
+        # Overwrite stable "latest" keys — used by portfolio website (CloudFront URL never changes)
+        await self._s3.upload(_LATEST_HTML_KEY, html_bytes, "text/html; charset=utf-8")
+        await self._s3.upload(_LATEST_JSON_KEY, json_bytes, "application/json")
+        print(f"  [s3] latest keys updated → {_LATEST_HTML_KEY}")
 
         # Record in DB
         db_report = CompetitorReport(
