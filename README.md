@@ -92,7 +92,7 @@ Client (bridging-data.com / CLI)
 | Embeddings | OpenAI text-embedding-3-small |
 | LLM (chat) | OpenAI gpt-4o-mini / Anthropic Claude (swappable) |
 | Chunking | langchain-text-splitters RecursiveCharacterTextSplitter |
-| Document loaders | pypdf, python-docx, beautifulsoup4, lxml, openpyxl — 18 formats: PDF, DOCX, TXT, MD, HTML, CSV, JSON, XLSX, PY, TS, JS, SQL, YAML, TOML, SH, TF |
+| Document loaders | pdfplumber (PDF), python-docx, beautifulsoup4, lxml, openpyxl — 18 formats: PDF, DOCX, TXT, MD, HTML, CSV, JSON, XLSX, PY, TS, JS, SQL, YAML, TOML, SH, TF |
 | Infrastructure | AWS Lambda or ECS, RDS, API Gateway, CloudFront |
 | CI/CD | GitHub Actions |
 | Local dev | Docker Compose (pgvector/pgvector:pg16) |
@@ -329,12 +329,138 @@ Updated `pyproject.toml` (`packages`, `src`, `coverage.source`) and `Makefile` (
 
 ---
 
-## Future Improvements
+## Regulatory Radar — Operations Guide
 
-### Phase 4 — Regulatory Radar
-- Version-aware document processing
-- Change detection and diff summaries
-- Long-term retention for regulatory findings
+> This section documents how the Regulatory Radar pipeline works and how to maintain it.
+> It is intentionally detailed so it can be ingested into the Private Knowledge Hub
+> and queried later: *"How do I update the EU AI Act in the Regulatory Radar?"*
+
+### How the Pipeline Works
+
+The Regulatory Radar runs automatically on the **1st of every month at 07:00 UTC** via AWS EventBridge + Lambda. It runs in 4 phases:
+
+```
+1. Collector   — fetches each active source URL, extracts text, computes SHA-256 hash
+                 → if hash changed: uploads raw file to S3, inserts RegulatoryDocument record
+                 → if unchanged: skips (zero cost)
+
+2. Analyzer    — for each unanalyzed RegulatoryDocument (is_latest=True, no change record yet):
+                 → diffs previous vs new version text (difflib, max 3,000 chars sent to LLM)
+                 → LLM classifies: impact_level (High/Medium/Low), category (Privacy/AI/Cybersecurity/Compliance)
+                 → inserts RegulatoryChange record
+
+3. Reporter    — loads all RegulatoryChanges not yet linked to a report
+                 → generates JSON + dark-themed HTML report
+                 → uploads to S3: regulatory/reports/YYYY/MM/regulatory_YYYYMMDD_HHMMSS.{json,html}
+                 → inserts RegulatoryReport record, links changes via report_id FK
+
+4. Notifier    — sends SNS email summary (subject: "N changes detected | M sources monitored")
+```
+
+### Monitored Sources
+
+| Source | Type | How monitored |
+|---|---|---|
+| NIST Cybersecurity Framework 2.0 | PDF | Auto — fetched from nvlpubs.nist.gov monthly |
+| OWASP Top 10 | HTML | Auto — fetched from owasp.org monthly |
+| FINMA Risk Monitor (index page) | HTML | Auto — detects when new annual report is published |
+| EU AI Act | PDF | **Manual** — EUR-Lex blocks automated access |
+| GDPR | PDF | **Manual** — EUR-Lex blocks automated access |
+| FINMA Risk Monitor 20XX | PDF | **Manual** — annual PDF downloaded manually |
+
+Auto sources: `active=True` in `regulatory_sources` table — collected every month.
+Manual sources: `active=False` — excluded from auto-collector, ingested via script (see below).
+
+### How to Update a Manual Source (EU AI Act / GDPR / FINMA Annual PDF)
+
+When a new version is published (e.g. EU AI Act amendment, new FINMA Risk Monitor):
+
+**Step 1 — Download the new PDF manually:**
+- EU AI Act: `https://eur-lex.europa.eu/legal-content/DE/TXT/?uri=celex:32024R1689`
+- GDPR: `https://eur-lex.europa.eu/legal-content/DE/TXT/?uri=celex:32016R0679`
+- FINMA Risk Monitor: `https://www.finma.ch/dokumentation/finma-publikationen/berichte/risikomonitor/`
+
+**Step 2 — Ingest the new PDF into the Regulatory Radar pipeline:**
+```bash
+uv run python scripts/ingest_regulatory_pdf.py "C:/path/to/EU-AI-Act-2027.pdf" "EU AI Act" "AI"
+uv run python scripts/ingest_regulatory_pdf.py "C:/path/to/GDPR-updated.pdf" "GDPR" "Privacy"
+uv run python scripts/ingest_regulatory_pdf.py "C:/path/to/FINMA_Risikomonitor_2027.pdf" "FINMA Risk Monitor 2027" "Compliance"
+```
+
+The script:
+- Extracts text with pdfplumber (handles complex regulatory PDF fonts correctly)
+- Computes SHA-256 hash — skips if identical to stored version
+- Uploads to S3 under `regulatory/raw/YYYY/MM/<slug>/<hash>.pdf`
+- Creates a `RegulatoryDocument` record with `is_latest=True`
+
+**Step 3 — Trigger the pipeline immediately (optional):**
+```bash
+uv run python -m apps.regulatory_pipeline.lambda_handler
+```
+Or wait — the Lambda will pick it up automatically on the 1st of next month.
+
+**Step 4 — Also update the Private Knowledge Hub (for Q&A):**
+- Open `localhost:8001` → Ingest Folder → paste the path to the new PDF
+- The system detects the hash change and re-embeds with the updated content
+
+### S3 Structure
+
+```
+ai-platform-documents-dev/
+├── regulatory/
+│   ├── raw/
+│   │   └── YYYY/MM/
+│   │       ├── nist-cybersecurity-framework-2-0/<hash>.pdf   ← auto-collected
+│   │       ├── owasp-top-10/<hash>.html                      ← auto-collected
+│   │       ├── finma-risk-monitor/<hash>.html                ← auto-collected
+│   │       ├── eu-ai-act/<hash>.pdf                          ← manually ingested
+│   │       └── gdpr/<hash>.pdf                               ← manually ingested
+│   └── reports/
+│       └── YYYY/MM/
+│           ├── regulatory_YYYYMMDD_HHMMSS.json               ← machine-readable
+│           └── regulatory_YYYYMMDD_HHMMSS.html               ← human-readable report
+```
+
+Raw documents are kept permanently (version history). Reports are retained for 24 months then deleted by the cleanup Lambda.
+
+### Retention Rules
+
+| Data | Retention | Managed by |
+|---|---|---|
+| `regulatory_documents` (raw versions) | **Permanent** — version history required | Never auto-deleted |
+| `regulatory_changes` (diff summaries) | **Permanent** | report_id set to NULL when report deleted, row kept |
+| `regulatory_reports` (DB record) | 24 months | Cleanup Lambda (1st of month, 03:00 UTC) |
+| S3 raw PDFs/HTML | Permanent | No lifecycle rule |
+| S3 report JSON/HTML | 24 months | Cleanup Lambda deletes S3 files before DB row |
+
+### Lambda Functions (Phase 4)
+
+| Function | Trigger | Timeout |
+|---|---|---|
+| `ai-platform-regulatory-pipeline` | EventBridge: 1st of month, 07:00 UTC | 300s |
+| `ai-platform-cleanup` | EventBridge: 1st of month, 03:00 UTC | 120s |
+
+Both use the same ECR image (`ai-platform-rag-demo:lambda`) with different `ImageConfig.Command`.
+
+**Redeploy after code changes:**
+```bash
+docker build -f Dockerfile.lambda -t ai-platform-rag-demo:lambda .
+docker tag ai-platform-rag-demo:lambda 759302162548.dkr.ecr.eu-central-1.amazonaws.com/ai-platform-rag-demo:lambda
+docker push 759302162548.dkr.ecr.eu-central-1.amazonaws.com/ai-platform-rag-demo:lambda
+uv run python scripts/deploy_regulatory_pipeline.py
+```
+
+### Seed Regulatory Sources (first time setup)
+
+If the `regulatory_sources` table is empty (e.g. after a fresh DB restore):
+```bash
+uv run python scripts/seed_regulatory_sources.py
+```
+Then manually re-ingest the EU AI Act, GDPR, and FINMA PDFs using the steps above.
+
+---
+
+## Future Improvements
 
 ### Phase 5 — Competitor Radar
 - Controlled web scraping
@@ -366,6 +492,30 @@ Updated `pyproject.toml` (`packages`, `src`, `coverage.source`) and `Makefile` (
 ---
 
 ## Project Progress
+
+### 20260619 — Phase 4 complete: Regulatory Radar pipeline live on AWS
+
+**Completed:**
+- Monthly Lambda pipeline (`ai-platform-regulatory-pipeline`) deployed, fires 1st of each month at 07:00 UTC
+- 4-phase pipeline: Collector → Analyzer → Reporter → Notifier
+- `regulatory_sources`, `regulatory_documents`, `regulatory_changes`, `regulatory_reports` schema (Alembic migration `e5a1b3c7d9f2`)
+- **RegulatoryCollectorAgent** — two-phase pattern (all HTTP fetches before opening DB session), SHA-256 hash on extracted text, `is_latest` flag per source, S3 upload to `regulatory/raw/YYYY/MM/`
+- **RegulatoryAnalyzerAgent** — `difflib.unified_diff` between versions (max 3,000 chars to LLM), impact classification (High/Medium/Low), category tagging (Privacy/AI/Cybersecurity/Compliance), idempotent (skips already-analyzed docs)
+- **RegulatoryReporterAgent** — dark-themed HTML + JSON report, uploaded to `regulatory/reports/YYYY/MM/`, changes linked via `report_id` FK with `SET NULL` on delete
+- **RegulatoryNotifierAgent** — SNS email reusing Phase 2 topic and IAM role
+- **CleanupAgent** extended — 24-month retention on regulatory reports (documents kept permanently)
+- `scripts/ingest_regulatory_pdf.py` — manual ingestion for EUR-Lex documents that block automated scraping (EU AI Act, GDPR, FINMA annual PDFs); creates `active=False` source, uploads to S3, inserts RegulatoryDocument for analyzer to pick up
+- Switched `PDFLoader` from `pypdf` to `pdfplumber` — fixes broken word spacing in complex regulatory PDFs (`T ransparenz` → `Transparenz`)
+- 6 sources monitored: NIST CSF 2.0 + OWASP Top 10 + FINMA index (auto) + EU AI Act + GDPR + FINMA Risk Monitor 2025 (manual)
+
+**Fixed during implementation:**
+- `UnicodeEncodeError` on `→` in print statements — Windows PowerShell cp1252 encoding; replaced with ASCII `->`
+- `MissingGreenlet` lazy-load after rollback — capture `source.name` before `try` block to avoid expired ORM object access
+- EUR-Lex and FINMA URLs block automated access — fallback to `scripts/ingest_regulatory_pdf.py` for manual ingestion
+- Reporter showing UUID instead of source name for manual sources — reporter was filtering `active=True` only; fixed to load all sources
+- `UniqueViolationError` on `url="manual"` — second manual source hit unique constraint; fixed to use `manual://<slug>` per source
+
+---
 
 ### 20260618 — Phase 3 complete: Private Knowledge Hub running locally
 
