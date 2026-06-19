@@ -179,6 +179,9 @@ def _render_html(report: dict) -> str:
     summary = report["summary"]
     companies = report["companies"]
 
+    # Collect unique companies for filter buttons
+    all_companies = [c["name"] for c in companies if c["signals"]]
+
     companies_html = ""
     for company_data in companies:
         company = company_data["name"]
@@ -194,7 +197,12 @@ def _render_html(report: dict) -> str:
             type_label = _SIGNAL_TYPE_LABELS.get(s["signal_type"], s["signal_type"])
             url_part = f'<a href="{_esc(s["url"])}" style="color:#38bdf8;font-size:0.75rem;text-decoration:none;">source</a>' if s.get("url") else ""
             signal_cards += f"""
-      <div style="background:#0f172a;border:1px solid #334155;border-radius:6px;padding:12px 16px;margin-bottom:8px;">
+      <div class="signal-card"
+           data-company="{_esc(company)}"
+           data-impact="{_esc(s['impact_level'])}"
+           data-type="{_esc(s['signal_type'])}"
+           data-sentiment="{_esc(s['sentiment'])}"
+           style="background:#0f172a;border:1px solid #334155;border-radius:6px;padding:12px 16px;margin-bottom:8px;">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap;">
           <span style="background:{ic}22;color:{itc};border:1px solid {ic}44;border-radius:4px;padding:1px 8px;font-size:0.72rem;font-weight:700;">{_esc(s['impact_level'])}</span>
           <span style="background:#1e293b;border:1px solid #334155;color:#94a3b8;border-radius:4px;padding:1px 8px;font-size:0.72rem;">{_esc(type_label)}</span>
@@ -206,13 +214,21 @@ def _render_html(report: dict) -> str:
       </div>"""
 
         companies_html += f"""
-    <div style="background:#1e293b;border:1px solid #334155;border-left:4px solid {color};border-radius:8px;padding:20px 24px;margin-bottom:20px;">
+    <div class="company-section" data-company="{_esc(company)}"
+         style="background:#1e293b;border:1px solid #334155;border-left:4px solid {color};border-radius:8px;padding:20px 24px;margin-bottom:20px;">
       <h3 style="margin:0 0 12px;font-size:1.05rem;color:{color};">{_esc(company)}</h3>
       {signal_cards}
+      <p class="no-results-msg" style="display:none;color:#475569;font-size:0.82rem;margin:0;">No signals match the current filters.</p>
     </div>"""
 
     if not companies_html:
         companies_html = '<p style="color:#475569;font-size:0.85rem;">No signals detected this week.</p>'
+
+    # Build company filter buttons
+    company_btns = '<button class="filter-btn active" data-group="company" data-value="all">All</button>'
+    for c in all_companies:
+        color = _COMPANY_COLORS.get(c, "#64748b")
+        company_btns += f'<button class="filter-btn" data-group="company" data-value="{_esc(c)}" style="--accent:{color}">{_esc(c)}</button>'
 
     return f"""<!DOCTYPE html>
 <html lang="en">
@@ -231,6 +247,21 @@ def _render_html(report: dict) -> str:
               border-bottom: 1px solid #334155; }}
     .stat .value {{ font-size: 1.8rem; font-weight: 700; color: #38bdf8; }}
     .stat .label {{ font-size: 0.75rem; color: #64748b; text-transform: uppercase; }}
+    .filters {{ background: #1e293b; padding: 16px 40px; border-bottom: 1px solid #334155;
+               display: flex; flex-direction: column; gap: 10px; }}
+    .filter-row {{ display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }}
+    .filter-label {{ font-size: 0.7rem; color: #475569; text-transform: uppercase;
+                    letter-spacing: 0.05em; min-width: 70px; }}
+    .filter-btn {{ background: transparent; border: 1px solid #334155; color: #64748b;
+                  border-radius: 4px; padding: 3px 12px; font-size: 0.75rem; cursor: pointer;
+                  transition: all 0.15s; }}
+    .filter-btn:hover {{ border-color: #475569; color: #94a3b8; }}
+    .filter-btn.active {{ background: var(--accent, #38bdf8); border-color: var(--accent, #38bdf8);
+                         color: #0f172a; font-weight: 600; }}
+    .filter-btn[data-value="High"].active {{ background:#ef4444;border-color:#ef4444;color:#fff; }}
+    .filter-btn[data-value="Medium"].active {{ background:#f59e0b;border-color:#f59e0b;color:#0f172a; }}
+    .filter-btn[data-value="Low"].active {{ background:#22c55e;border-color:#22c55e;color:#0f172a; }}
+    #filter-count {{ font-size: 0.78rem; color: #475569; padding: 6px 0 0; }}
     main {{ padding: 32px 40px; max-width: 1100px; }}
     h2 {{ font-size: 1.1rem; font-weight: 600; color: #f1f5f9;
           margin: 0 0 20px; border-left: 5px solid #334155; padding-left: 12px; }}
@@ -246,13 +277,81 @@ def _render_html(report: dict) -> str:
   </header>
   <div class="stats">
     <div class="stat"><div class="value">{summary['company_count']}</div><div class="label">Companies</div></div>
-    <div class="stat"><div class="value">{summary['signal_count']}</div><div class="label">Signals</div></div>
+    <div class="stat"><div class="value" id="visible-count">{summary['signal_count']}</div><div class="label">Signals</div></div>
   </div>
+
+  <div class="filters">
+    <div class="filter-row">
+      <span class="filter-label">Company</span>
+      {company_btns}
+    </div>
+    <div class="filter-row">
+      <span class="filter-label">Impact</span>
+      <button class="filter-btn active" data-group="impact" data-value="all">All</button>
+      <button class="filter-btn" data-group="impact" data-value="High">High</button>
+      <button class="filter-btn" data-group="impact" data-value="Medium">Medium</button>
+      <button class="filter-btn" data-group="impact" data-value="Low">Low</button>
+    </div>
+    <div class="filter-row">
+      <span class="filter-label">Type</span>
+      <button class="filter-btn active" data-group="type" data-value="all">All</button>
+      <button class="filter-btn" data-group="type" data-value="product_announcement">Product</button>
+      <button class="filter-btn" data-group="type" data-value="pricing_change">Pricing</button>
+      <button class="filter-btn" data-group="type" data-value="financial_update">Financial</button>
+      <button class="filter-btn" data-group="type" data-value="sentiment_event">Sentiment</button>
+    </div>
+    <div class="filter-row">
+      <span class="filter-label">Sentiment</span>
+      <button class="filter-btn active" data-group="sentiment" data-value="all">All</button>
+      <button class="filter-btn" data-group="sentiment" data-value="positive" style="--accent:#22c55e">Positive</button>
+      <button class="filter-btn" data-group="sentiment" data-value="neutral" style="--accent:#94a3b8">Neutral</button>
+      <button class="filter-btn" data-group="sentiment" data-value="negative" style="--accent:#ef4444">Negative</button>
+    </div>
+  </div>
+
   <main>
     <h2>Signals This Week</h2>
     {companies_html}
   </main>
   <footer>AI Platform &middot; Competitor Radar &middot; bridging-data.com</footer>
+
+  <script>
+    const state = {{ company: 'all', impact: 'all', type: 'all', sentiment: 'all' }};
+
+    function applyFilters() {{
+      let visible = 0;
+      document.querySelectorAll('.company-section').forEach(section => {{
+        const company = section.dataset.company;
+        const companyMatch = state.company === 'all' || state.company === company;
+        let sectionVisible = 0;
+
+        section.querySelectorAll('.signal-card').forEach(card => {{
+          const match = companyMatch
+            && (state.impact   === 'all' || card.dataset.impact    === state.impact)
+            && (state.type     === 'all' || card.dataset.type      === state.type)
+            && (state.sentiment=== 'all' || card.dataset.sentiment === state.sentiment);
+          card.style.display = match ? '' : 'none';
+          if (match) sectionVisible++;
+        }});
+
+        section.style.display = sectionVisible > 0 ? '' : 'none';
+        section.querySelector('.no-results-msg').style.display =
+          (companyMatch && sectionVisible === 0) ? '' : 'none';
+        visible += sectionVisible;
+      }});
+      document.getElementById('visible-count').textContent = visible;
+    }}
+
+    document.querySelectorAll('.filter-btn').forEach(btn => {{
+      btn.addEventListener('click', () => {{
+        const group = btn.dataset.group;
+        document.querySelectorAll(`.filter-btn[data-group="${{group}}"]`).forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        state[group] = btn.dataset.value;
+        applyFilters();
+      }});
+    }});
+  </script>
 </body>
 </html>"""
 
