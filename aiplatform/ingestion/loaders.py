@@ -14,22 +14,23 @@ from aiplatform.ingestion.base import DocumentLoader, LoadedDocument
 
 class PDFLoader(DocumentLoader):
     async def load(self, source: str | Path) -> LoadedDocument:
-        from pypdf import PdfReader
+        import pdfplumber
 
         path = Path(source)
-        reader = PdfReader(str(path))
         pages = []
-        for i, page in enumerate(reader.pages):
-            text = page.extract_text() or ""
-            if text.strip():
-                pages.append(text)
+        with pdfplumber.open(str(path)) as pdf:
+            page_count = len(pdf.pages)
+            for page in pdf.pages:
+                text = page.extract_text(x_tolerance=2, y_tolerance=3) or ""
+                if text.strip():
+                    pages.append(text)
 
         return LoadedDocument(
             content="\n\n".join(pages),
             source_uri=str(path),
             mime_type="application/pdf",
             metadata={
-                "page_count": len(reader.pages),
+                "page_count": page_count,
                 "filename": path.name,
             },
         )
