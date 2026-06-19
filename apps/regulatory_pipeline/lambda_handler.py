@@ -66,3 +66,8 @@ def handler(event, context):
             "statusCode": 500,
             "body": json.dumps({"status": "error", "error": str(exc)}),
         }
+
+
+if __name__ == "__main__":
+    # Local trigger: uv run python -m apps.regulatory_pipeline.lambda_handler
+    asyncio.run(_run_pipeline())
