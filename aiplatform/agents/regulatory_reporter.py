@@ -65,10 +65,10 @@ class RegulatoryReporterAgent:
         result = RegulatoryReportResult()
         now = datetime.now(UTC)
 
-        # Load all active sources
+        # Load all sources (active + manual/inactive)
         sources = (
             await session.scalars(
-                select(RegulatorySource).where(RegulatorySource.active.is_(True))
+                select(RegulatorySource).order_by(RegulatorySource.name)
             )
         ).all()
         result.source_count = len(sources)
@@ -123,9 +123,10 @@ class RegulatoryReporterAgent:
                 {
                     "name": s.name,
                     "domain": s.domain,
-                    "url": s.url,
+                    "url": s.url if s.active else None,
                     "last_checked_at": s.last_checked_at.isoformat() if s.last_checked_at else None,
                     "has_change_this_run": str(s.id) in change_by_source,
+                    "is_manual": not s.active,
                 }
                 for s in sources
             ],
@@ -288,10 +289,16 @@ def _render_sources(sources: list[dict]) -> str:
         dot = '<span class="dot-green">●</span>' if s["has_change_this_run"] else '<span class="dot-gray">●</span>'
         checked = s["last_checked_at"][:10] if s["last_checked_at"] else "—"
         domain_color = _DOMAIN_COLORS.get(s["domain"], "#64748b")
+        manual_tag = ' <span style="font-size:0.7rem;color:#64748b;background:#1e293b;border:1px solid #334155;border-radius:4px;padding:1px 5px;">manual</span>' if s.get("is_manual") else ""
+        name_cell = (
+            f'<a href="{_esc(s["url"])}" style="color:#38bdf8; text-decoration:none;">{_esc(s["name"])}</a>'
+            if s["url"]
+            else f'<span style="color:#cbd5e1;">{_esc(s["name"])}</span>'
+        )
         rows += f"""
     <tr>
       <td>{dot}</td>
-      <td><a href="{_esc(s['url'])}" style="color:#38bdf8; text-decoration:none;">{_esc(s['name'])}</a></td>
+      <td>{name_cell}{manual_tag}</td>
       <td><span style="color:{domain_color}; font-size:0.78rem;">{_esc(s['domain'])}</span></td>
       <td style="color:#64748b;">{checked}</td>
     </tr>"""
