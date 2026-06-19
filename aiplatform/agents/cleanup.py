@@ -2,11 +2,14 @@
 Cleanup Agent — enforces data retention policies.
 
 Retention rules (from CLAUDE.md):
-  raw_articles         : 30 days  (expires_at column set on insert)
-  radar_reports        : 24 months (generated_at < cutoff → delete S3 + DB row)
-  regulatory_reports   : 24 months (generated_at < cutoff → delete S3 JSON/HTML + DB row)
-  regulatory_documents : KEEP — version history required for historical comparison
-  regulatory_changes   : KEEP — report_id set to NULL on report delete, changes retained
+  raw_articles                : 30 days  (expires_at column set on insert)
+  radar_reports               : 24 months (generated_at < cutoff → delete S3 + DB row)
+  regulatory_reports          : 24 months (generated_at < cutoff → delete S3 JSON/HTML + DB row)
+  regulatory_documents        : KEEP — version history required for historical comparison
+  regulatory_changes          : KEEP — report_id set to NULL on report delete, changes retained
+  competitor_raw_content      : 30 days  (expires_at column set on insert)
+  competitor_signals          : 12 months (expires_at column set on insert)
+  competitor_reports          : 12 months (generated_at < cutoff → delete S3 JSON/HTML + DB row)
 
 Runs monthly via EventBridge. Safe to re-run at any time.
 """
@@ -17,11 +20,13 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from aiplatform.storage.competitor_models import CompetitorRawContent, CompetitorReport, CompetitorSignal
 from aiplatform.storage.radar_models import RadarReport, RawArticle
 from aiplatform.storage.regulatory_models import RegulatoryReport
 from aiplatform.storage.s3 import S3Client
 
 _REPORT_RETENTION_MONTHS = 24
+_COMPETITOR_REPORT_RETENTION_MONTHS = 12
 
 
 @dataclass
@@ -29,6 +34,9 @@ class CleanupResult:
     articles_deleted: int = 0
     reports_deleted: int = 0
     regulatory_reports_deleted: int = 0
+    competitor_raw_content_deleted: int = 0
+    competitor_signals_deleted: int = 0
+    competitor_reports_deleted: int = 0
     s3_objects_deleted: int = 0
     errors: list[str] = None  # type: ignore[assignment]
 
@@ -41,6 +49,9 @@ class CleanupResult:
             f"articles_deleted={self.articles_deleted} "
             f"reports_deleted={self.reports_deleted} "
             f"regulatory_reports_deleted={self.regulatory_reports_deleted} "
+            f"competitor_raw_deleted={self.competitor_raw_content_deleted} "
+            f"competitor_signals_deleted={self.competitor_signals_deleted} "
+            f"competitor_reports_deleted={self.competitor_reports_deleted} "
             f"s3_deleted={self.s3_objects_deleted} "
             f"errors={len(self.errors)}"
         )
@@ -56,6 +67,9 @@ class CleanupAgent:
         await self._delete_expired_articles(session, result)
         await self._delete_old_reports(session, result)
         await self._delete_old_regulatory_reports(session, result)
+        await self._delete_expired_competitor_raw_content(session, result)
+        await self._delete_expired_competitor_signals(session, result)
+        await self._delete_old_competitor_reports(session, result)
 
         return result
 
@@ -127,6 +141,55 @@ class CleanupAgent:
             result.regulatory_reports_deleted += 1
 
         print(f"  [cleanup] regulatory_reports deleted: {result.regulatory_reports_deleted}")
+
+
+    async def _delete_expired_competitor_raw_content(
+        self, session: AsyncSession, result: CleanupResult
+    ) -> None:
+        now = datetime.now(UTC)
+        stmt = delete(CompetitorRawContent).where(CompetitorRawContent.expires_at < now)
+        db_result = await session.execute(stmt)
+        result.competitor_raw_content_deleted = db_result.rowcount
+        print(f"  [cleanup] competitor_raw_content deleted: {result.competitor_raw_content_deleted}")
+
+    async def _delete_expired_competitor_signals(
+        self, session: AsyncSession, result: CleanupResult
+    ) -> None:
+        now = datetime.now(UTC)
+        stmt = delete(CompetitorSignal).where(CompetitorSignal.expires_at < now)
+        db_result = await session.execute(stmt)
+        result.competitor_signals_deleted = db_result.rowcount
+        print(f"  [cleanup] competitor_signals deleted: {result.competitor_signals_deleted}")
+
+    async def _delete_old_competitor_reports(
+        self, session: AsyncSession, result: CleanupResult
+    ) -> None:
+        cutoff = datetime.now(UTC) - timedelta(days=_COMPETITOR_REPORT_RETENTION_MONTHS * 30)
+
+        old_reports = (
+            await session.scalars(
+                select(CompetitorReport).where(CompetitorReport.generated_at < cutoff)
+            )
+        ).all()
+
+        print(f"  [cleanup] old competitor_reports found: {len(old_reports)}")
+
+        for report in old_reports:
+            for key in [report.s3_key_json, report.s3_key_html]:
+                if not key:
+                    continue
+                try:
+                    await self._s3.delete(key)
+                    result.s3_objects_deleted += 1
+                    print(f"  [cleanup] s3 deleted: {key}")
+                except Exception as exc:
+                    result.errors.append(f"s3 delete {key}: {exc}")
+                    print(f"  [cleanup] s3 delete failed: {key}: {exc}")
+
+            await session.delete(report)
+            result.competitor_reports_deleted += 1
+
+        print(f"  [cleanup] competitor_reports deleted: {result.competitor_reports_deleted}")
 
 
 def _derive_s3_keys(json_key: str) -> list[str]:

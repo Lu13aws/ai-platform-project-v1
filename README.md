@@ -462,10 +462,7 @@ Then manually re-ingest the EU AI Act, GDPR, and FINMA PDFs using the steps abov
 
 ## Future Improvements
 
-### Phase 5 — Competitor Radar
-- Controlled web scraping
-- Signal extraction agent
-- Trend summaries
+### Phase 6 — Corporate LLM Prototype
 
 ### Phase 6 — Corporate LLM Prototype
 - Authentication (AWS Cognito)
@@ -492,6 +489,32 @@ Then manually re-ingest the EU AI Act, GDPR, and FINMA PDFs using the steps abov
 ---
 
 ## Project Progress
+
+### 20260619 — Phase 5 complete: Competitor Radar pipeline
+
+**Completed:**
+- Weekly Lambda pipeline (`ai-platform-competitor-pipeline`) deployed, fires every Monday at 08:00 UTC
+- 4-phase pipeline: Collector → Analyzer → Reporter → Notifier
+- `competitor_sources`, `competitor_raw_content`, `competitor_signals`, `competitor_reports` schema (Alembic migration `145530df3842`)
+- **CompetitorCollectorAgent** — 4 source types in one agent:
+  - *Blog* — RSS/Atom or HTML scraping, ≤15 articles per source, stored as `CompetitorRawContent`
+  - *Pricing* — HTML hash-based change detection, direct `CompetitorSignal` on change (no LLM cost)
+  - *Financial* — Yahoo Finance public API (no key), weekly % change, signal only if |move| > 5%
+  - *Community* — HN Algolia search API (no key), past 7 days, stored as `CompetitorRawContent`
+- **CompetitorAnalyzerAgent** — LLM classifies each raw article: `signal_type` (product_announcement/pricing_change/financial_update/sentiment_event), `sentiment`, `impact_level`, relevance filter; `MAX_LLM_CALLS_PER_RUN` hard limit
+- **CompetitorReporterAgent** — dark-themed HTML + JSON report grouped by company, sorted High→Low impact, uploaded to `competitor/reports/YYYY/MM/`
+- **CompetitorNotifierAgent** — SNS email reusing shared topic
+- **CleanupAgent** extended — `competitor_raw_content` 30-day expiry, `competitor_signals` 12-month expiry, `competitor_reports` 12-month retention with S3 cleanup
+- 6 companies monitored: OpenAI, Anthropic, Microsoft, AWS, Google, Mistral AI
+- 21 sources seeded: 6 blogs, 6 pricing pages, 3 financial (MSFT/AMZN/GOOGL), 6 HN community searches
+- First run: 107 articles collected, 76 relevant signals, 5 pricing change signals (initial captures)
+
+**Known limitations:**
+- OpenAI pricing page returns 403 — needs alternative URL or manual monitoring
+- Financial signals only trigger on >5% weekly move — stocks stable this week, no financial signals
+- `MAX_LLM_CALLS_PER_RUN=100` caps analysis per run — remaining 7 articles analyzed next run
+
+---
 
 ### 20260619 — Phase 4 complete: Regulatory Radar pipeline live on AWS
 
