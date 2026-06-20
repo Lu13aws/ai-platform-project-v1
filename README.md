@@ -63,7 +63,7 @@ https://miro.com/app/board/uXjVHErgZ40=/?moveToWidget=3458764675724444499&cot=14
 
 ### Diagramms Phase 2 - Technology Radar
 
-https://miro.com/app/board/uXjVHErgZ40=/?moveToWidget=3458764675869493800&cot=14
+https://miro.com/app/board/uXjVHErgZ40=/?moveToWidget=3458764676069211957&cot=14
 
 ### Diagramms Phase 3 - Private Knowledge Hub
 
