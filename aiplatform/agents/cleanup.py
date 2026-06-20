@@ -10,6 +10,7 @@ Retention rules (from CLAUDE.md):
   competitor_raw_content      : 30 days  (expires_at column set on insert)
   competitor_signals          : 12 months (expires_at column set on insert)
   competitor_reports          : 12 months (generated_at < cutoff → delete S3 JSON/HTML + DB row)
+  linkedin_posts              : 12 months (created_at < cutoff → delete DB row, no S3)
 
 Runs monthly via EventBridge. Safe to re-run at any time.
 """
@@ -21,12 +22,14 @@ from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from aiplatform.storage.competitor_models import CompetitorRawContent, CompetitorReport, CompetitorSignal
+from aiplatform.storage.content_models import LinkedInPost
 from aiplatform.storage.radar_models import RadarReport, RawArticle
 from aiplatform.storage.regulatory_models import RegulatoryReport
 from aiplatform.storage.s3 import S3Client
 
 _REPORT_RETENTION_MONTHS = 24
 _COMPETITOR_REPORT_RETENTION_MONTHS = 12
+_LINKEDIN_POST_RETENTION_MONTHS = 12
 
 
 @dataclass
@@ -37,6 +40,7 @@ class CleanupResult:
     competitor_raw_content_deleted: int = 0
     competitor_signals_deleted: int = 0
     competitor_reports_deleted: int = 0
+    linkedin_posts_deleted: int = 0
     s3_objects_deleted: int = 0
     errors: list[str] = None  # type: ignore[assignment]
 
@@ -52,6 +56,7 @@ class CleanupResult:
             f"competitor_raw_deleted={self.competitor_raw_content_deleted} "
             f"competitor_signals_deleted={self.competitor_signals_deleted} "
             f"competitor_reports_deleted={self.competitor_reports_deleted} "
+            f"linkedin_posts_deleted={self.linkedin_posts_deleted} "
             f"s3_deleted={self.s3_objects_deleted} "
             f"errors={len(self.errors)}"
         )
@@ -70,6 +75,7 @@ class CleanupAgent:
         await self._delete_expired_competitor_raw_content(session, result)
         await self._delete_expired_competitor_signals(session, result)
         await self._delete_old_competitor_reports(session, result)
+        await self._delete_old_linkedin_posts(session, result)
 
         return result
 
@@ -190,6 +196,16 @@ class CleanupAgent:
             result.competitor_reports_deleted += 1
 
         print(f"  [cleanup] competitor_reports deleted: {result.competitor_reports_deleted}")
+
+
+    async def _delete_old_linkedin_posts(
+        self, session: AsyncSession, result: CleanupResult
+    ) -> None:
+        cutoff = datetime.now(UTC) - timedelta(days=_LINKEDIN_POST_RETENTION_MONTHS * 30)
+        stmt = delete(LinkedInPost).where(LinkedInPost.created_at < cutoff)
+        db_result = await session.execute(stmt)
+        result.linkedin_posts_deleted = db_result.rowcount
+        print(f"  [cleanup] linkedin_posts deleted: {result.linkedin_posts_deleted}")
 
 
 def _derive_s3_keys(json_key: str) -> list[str]:

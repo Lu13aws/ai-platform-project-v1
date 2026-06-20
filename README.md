@@ -19,13 +19,18 @@ ai-platform-project-v1/
 │   ├── ingestion/          # Document loaders, chunker, deduplication (hash-based)
 │   ├── retrieval/          # Embedder, pgvector search, hybrid retriever
 │   └── agents/             # CollectorAgent, AnalyzerAgent, ChangeDetectionAgent,
-│                           # ReporterAgent, NotifierAgent, CleanupAgent
+│                           # ReporterAgent, NotifierAgent, CleanupAgent,
+│                           # ReportIndexerAgent (auto-indexes S3 reports into vector store)
 ├── apps/
 │   ├── rag_demo/           # Phase 1 — Public RAG Demo FastAPI application
 │   │   ├── api/            # Routes, schemas, radar API endpoints
 │   │   ├── services/       # Ingest and query business logic
 │   │   └── cli.py          # Click CLI for local ingestion runs
-│   ├── radar_pipeline/     # Phase 2 — Weekly Lambda handler (EventBridge trigger)
+│   ├── radar_pipeline/     # Phase 2 — Weekly Lambda handler (EventBridge trigger, Mon 06:00 UTC)
+│   ├── competitor_pipeline/ # Phase 5 — Weekly Lambda handler (Mon 08:00 UTC)
+│   ├── regulatory_pipeline/ # Phase 4 — Monthly Lambda handler (1st of month, 07:00 UTC)
+│   ├── knowledge_platform/ # Phase 3+ — Knowledge Hub API (skills, ingest-skill, agents, chat)
+│   ├── knowledge_platform_ui/ # Phase 3+ — Next.js multi-page SPA (AI Chat, Agent Center, Sources)
 │   ├── cleanup/            # Phase 2 — Monthly cleanup Lambda (retention enforcement)
 │   └── private_hub/        # Phase 3 — Private Knowledge Hub (local only, localhost:8001)
 │       ├── main.py         # FastAPI app: ingest, query, sources, stats, delete, UI
@@ -173,18 +178,44 @@ The `docker/postgres/init.sql` script enables the `vector` and `uuid-ossp` exten
 - Latest radar report: `GET /api/v1/radar/report/latest`
 - CORS: `https://bridging-data.com` (production), `*` (development)
 - Lambda (RAG demo): `ai-platform-rag-demo`, 512 MB, 60s timeout, container image
-- Lambda (radar pipeline): `ai-platform-radar-pipeline`, 512 MB, 300s timeout, weekly EventBridge
-- Lambda (cleanup): `ai-platform-cleanup`, 256 MB, 120s timeout, monthly EventBridge
+- Lambda (radar pipeline): `ai-platform-radar-pipeline`, 512 MB, 300s timeout, Monday 06:00 UTC
+- Lambda (competitor pipeline): `ai-platform-competitor-pipeline`, 512 MB, 300s timeout, Monday 08:00 UTC
+- Lambda (regulatory pipeline): `ai-platform-regulatory-pipeline`, 512 MB, 300s timeout, 1st of month 07:00 UTC
+- Lambda (cleanup): `ai-platform-cleanup`, 256 MB, 120s timeout, 1st of month 03:00 UTC
 - ECR: `759302162548.dkr.ecr.eu-central-1.amazonaws.com/ai-platform-rag-demo:lambda`
 
-**Redeploy after code changes (all functions use the same image):**
+**Redeploy after code changes (all functions share the same image):**
+
+> **Important:** Docker build cache on Windows can produce the same ECR layer digest even after code changes.
+> Use a timestamp tag to force ECR to accept new layers, then deploy with the pinned digest.
+
 ```bash
-docker build -f Dockerfile.lambda -t ai-platform-rag-demo:lambda .
+# 1. Build without cache
+docker build --no-cache -f Dockerfile.lambda -t ai-platform-rag-demo:lambda .
+
+# 2. Verify new code is in the local image
+docker run --rm --entrypoint python ai-platform-rag-demo:lambda -c \
+  "from aiplatform.agents.report_indexer import ReportIndexerAgent; print('ok')"
+
+# 3. Push with timestamp tag (avoids ECR dedup of unchanged lambda tag)
+$ts = Get-Date -Format "yyyyMMddHHmm"
+docker tag ai-platform-rag-demo:lambda 759302162548.dkr.ecr.eu-central-1.amazonaws.com/ai-platform-rag-demo:lambda-$ts
+docker push 759302162548.dkr.ecr.eu-central-1.amazonaws.com/ai-platform-rag-demo:lambda-$ts
+
+# 4. Update all Lambda functions with the pinned digest
+$digest = (aws ecr describe-images --repository-name ai-platform-rag-demo --image-ids imageTag=lambda-$ts --query "imageDetails[0].imageDigest" --output text)
+$ecr = "759302162548.dkr.ecr.eu-central-1.amazonaws.com/ai-platform-rag-demo@$digest"
+aws lambda update-function-code --function-name ai-platform-rag-demo             --image-uri $ecr --region eu-central-1
+aws lambda update-function-code --function-name ai-platform-radar-pipeline        --image-uri $ecr --region eu-central-1
+aws lambda update-function-code --function-name ai-platform-competitor-pipeline   --image-uri $ecr --region eu-central-1
+aws lambda update-function-code --function-name ai-platform-regulatory-pipeline   --image-uri $ecr --region eu-central-1
+aws lambda update-function-code --function-name ai-platform-cleanup               --image-uri $ecr --region eu-central-1
+
+# 5. Update the lambda tag to point to the new image
 docker tag ai-platform-rag-demo:lambda 759302162548.dkr.ecr.eu-central-1.amazonaws.com/ai-platform-rag-demo:lambda
 docker push 759302162548.dkr.ecr.eu-central-1.amazonaws.com/ai-platform-rag-demo:lambda
-uv run python scripts/deploy_lambda.py            # RAG demo API
-uv run python scripts/deploy_radar_pipeline.py   # radar pipeline + EventBridge
-uv run python scripts/deploy_cleanup.py          # cleanup Lambda + EventBridge
+
+uv run python scripts/deploy_lambda.py            # updates RAG demo env vars / config
 ```
 
 ---
@@ -333,6 +364,11 @@ Updated `pyproject.toml` (`packages`, `src`, `coverage.source`) and `Makefile` (
 - Adding sentiment to an existing LLM classification prompt costs nothing extra — extend the JSON response template in the same call
 - SNS `create_topic()` is idempotent; `add_permission()` on Lambda raises `ResourceConflictException` on re-deploy — always catch and continue
 - A snapshot pattern (`UPDATE table SET previous_column = current_column`) before each pipeline run enables cheap change detection: `NULL` previous value means new entry, differing values mean movement
+- asyncpg connections are bound to the event loop that created them — on warm Lambda container reuse, `asyncio.run()` creates a new loop and old connections raise "Future attached to different loop"; fix: `await engine.dispose()` in `try/finally` INSIDE the same `asyncio.run()` call (not in an outer `finally`)
+- Docker build cache on Windows (Docker Desktop + WSL2) can produce identical ECR layer digests even after Python file changes; fix: push with a timestamp tag (`lambda-YYYYMMDDHHMM`) to bypass ECR deduplication, then deploy Lambdas using the pinned `@sha256:...` digest
+- When a pipeline has multiple phases sharing a DB session, an error in one phase (e.g. `UniqueViolationError`) rolls back the transaction and leaves the session in `PendingRollbackError` state — subsequent phases that try to use the same session will fail silently; fix: each phase and each agent opens its own `async with get_async_session()` context
+- Content-hash dedup must check BOTH `source_uri` AND `content_hash` — pipelines that run with no new data generate identical report content under a new timestamped S3 key; without the content-hash check this hits the UNIQUE constraint and corrupts the pipeline session
+- Pipeline-integrated agents (like a report indexer) should always catch all exceptions and return an error string instead of raising — a non-critical phase should never fail the whole pipeline
 
 ---
 
@@ -647,6 +683,26 @@ Then manually re-ingest the EU AI Act, GDPR, and FINMA PDFs using the steps abov
 ---
 
 ## Project Progress
+
+### 20260620 — Phase 5+: Auto-indexer integrated into all pipeline Lambdas
+
+**Completed:**
+- `ReportIndexerAgent` (`aiplatform/agents/report_indexer.py`) — new agent that downloads JSON reports from S3, converts them to readable text, and ingests them into the vector store via `ingest_skill`
+- **Auto-indexing** added as pipeline Phase 5 in all three pipelines (radar, competitor, regulatory) — runs automatically after each reporter phase, before the notifier
+- AI Chat can now answer questions about the latest reports without any manual indexing step
+- **Session isolation**: indexer manages its own `async with get_async_session()` — errors never corrupt the pipeline session
+- **Content-hash dedup** added to `ingest_skill` — prevents `UniqueViolationError` when identical report content appears under a new timestamped S3 key
+- **asyncpg warm-container fix**: all pipeline handlers now call `await engine.dispose()` in `try/finally` at the end of `_run_pipeline()` — prevents "Future attached to different loop" on Lambda warm-container reuse
+- **Docker ECR deploy fix**: timestamp tag (`lambda-YYYYMMDDHHMM`) + pinned digest deploy — bypasses ECR layer deduplication that caused stale code to persist after `--no-cache` builds on Windows
+- `scripts/ingest_reports.py` — manual backfill script for historical reports (`--latest`, `--dry-run` flags)
+- 9 historical reports (3 radar + 3 competitor + 3 regulatory) indexed into vector store
+
+**Verified:**
+- Cold start: `status=ok | indexer=skipped` (content unchanged, dedup works)
+- Warm start: `status=ok | indexer=ok (6 chunks)` (new S3 key, new content indexed)
+- All three pipelines tested successfully with new image digest
+
+---
 
 ### 20260619 — Phase 5 complete: Competitor Radar pipeline
 

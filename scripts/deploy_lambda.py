@@ -75,6 +75,7 @@ def build_env_vars() -> dict[str, str]:
     return {
         "APP_ENV": "production",
         "DATABASE_URL": settings.database_url,
+        "ALEMBIC_DATABASE_URL": settings.alembic_database_url,
         "OPENAI_API_KEY": settings.openai_api_key.get_secret_value(),
         "LLM_PROVIDER": settings.llm_provider,
         "OPENAI_CHAT_MODEL": settings.openai_chat_model,

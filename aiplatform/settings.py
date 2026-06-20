@@ -120,6 +120,12 @@ class Settings(BaseSettings):
     # to skip the production API key validation.
     require_llm: bool = True
 
+    # ── LinkedIn ──────────────────────────────────────────────────────────────
+
+    linkedin_client_id: str = ""
+    linkedin_client_secret: SecretStr = Field(default=SecretStr(""))
+    linkedin_secret_name: str = "linkedin/credentials"
+
     # ── RAG Demo App ──────────────────────────────────────────────────────────
 
     rag_demo_port: int = Field(default=8000, ge=1024, le=65535)

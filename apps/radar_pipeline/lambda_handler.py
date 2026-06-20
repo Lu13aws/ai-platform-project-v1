@@ -2,12 +2,13 @@
 Radar Pipeline Lambda handler.
 
 Runs the full Technology Radar pipeline in sequence:
-  0. Snapshot      — SET previous_category = category for all existing entries
+  0. Snapshot        — SET previous_category = category for all existing entries
   1. CollectorAgent  — fetch articles from all active sources
   2. AnalyzerAgent   — LLM classification of unprocessed articles
-  3. ReporterAgent   — generate JSON + HTML report, upload to S3
-  4. ChangeDetector  — detect category moves and new entries
-  5. NotifierAgent   — send run summary + change report via SNS email
+  3. ChangeDetector  — detect category moves and new entries
+  4. ReporterAgent   — generate JSON + HTML report, upload to S3
+  5. ReportIndexer   — index report into vector store (AI Chat)
+  6. NotifierAgent   — send run summary + change report via SNS email
 
 Each agent runs in its own DB session so failures in later phases
 do not roll back earlier committed data.
@@ -25,14 +26,12 @@ from aiplatform.agents.analyzer import AnalyzerAgent
 from aiplatform.agents.change_detector import ChangeDetectionAgent, ChangeReport
 from aiplatform.agents.collector import CollectorAgent
 from aiplatform.agents.notifier import NotifierAgent
+from aiplatform.agents.report_indexer import ReportIndexerAgent
 from aiplatform.agents.reporter import ReporterAgent
-from aiplatform.storage.database import get_async_session
+from aiplatform.storage.database import engine, get_async_session  # get_async_session: pipeline phases
 
 
 async def _snapshot_previous_categories() -> None:
-    """Before the pipeline runs, save current categories as previous_category.
-    New entries created this run will have previous_category = NULL — detected as 'new'.
-    """
     async with get_async_session() as session:
         await session.execute(
             text("UPDATE radar_entries SET previous_category = category")
@@ -42,39 +41,50 @@ async def _snapshot_previous_categories() -> None:
 
 async def _run_pipeline() -> tuple[dict, ChangeReport | None]:
     results: dict[str, str] = {}
-
-    print("[pipeline] phase 0 — snapshot")
-    await _snapshot_previous_categories()
-
-    print("[pipeline] phase 1/4 — collector")
-    async with get_async_session() as session:
-        collector_result = await CollectorAgent().run(session)
-    results["collector"] = str(collector_result)
-    print(f"[pipeline] collector done: {results['collector']}")
-
-    print("[pipeline] phase 2/4 — analyzer")
-    async with get_async_session() as session:
-        analyzer_result = await AnalyzerAgent().run(session)
-    results["analyzer"] = str(analyzer_result)
-    print(f"[pipeline] analyzer done: {results['analyzer']}")
-
-    print("[pipeline] phase 3/4 — change detection")
     change_report: ChangeReport | None = None
-    async with get_async_session() as session:
-        change_report = await ChangeDetectionAgent().run(session)
-    results["changes"] = str(change_report)
-    print(f"[pipeline] changes: {results['changes']}")
+    try:
+        print("[pipeline] phase 0 — snapshot")
+        await _snapshot_previous_categories()
 
-    print("[pipeline] phase 4/4 — reporter")
-    async with get_async_session() as session:
-        reporter_result = await ReporterAgent(change_report=change_report).run(session)
-    results["reporter"] = str(reporter_result)
-    print(f"[pipeline] reporter done: {results['reporter']}")
+        print("[pipeline] phase 1/4 — collector")
+        async with get_async_session() as session:
+            collector_result = await CollectorAgent().run(session)
+        results["collector"] = str(collector_result)
+        print(f"[pipeline] collector done: {results['collector']}")
 
-    print("[pipeline] phase 5 — notify")
-    NotifierAgent().run(results, change_report=change_report)
+        print("[pipeline] phase 2/4 — analyzer")
+        async with get_async_session() as session:
+            analyzer_result = await AnalyzerAgent().run(session)
+        results["analyzer"] = str(analyzer_result)
+        print(f"[pipeline] analyzer done: {results['analyzer']}")
 
-    return results, change_report
+        print("[pipeline] phase 3/4 — change detection")
+        async with get_async_session() as session:
+            change_report = await ChangeDetectionAgent().run(session)
+        results["changes"] = str(change_report)
+        print(f"[pipeline] changes: {results['changes']}")
+
+        print("[pipeline] phase 4/4 — reporter")
+        async with get_async_session() as session:
+            reporter_result = await ReporterAgent(change_report=change_report).run(session)
+        results["reporter"] = str(reporter_result)
+        print(f"[pipeline] reporter done: {results['reporter']}")
+
+        print("[pipeline] phase 5 — index report")
+        index_result = await ReportIndexerAgent().index_report(
+            "radar", reporter_result.json_s3_uri
+        )
+        results["indexer"] = index_result
+        print(f"[pipeline] indexer done: {index_result}")
+
+        print("[pipeline] phase 6 — notify")
+        NotifierAgent().run(results, change_report=change_report)
+
+        return results, change_report
+    finally:
+        # Dispose inside same event loop — prevents "Future attached to different loop"
+        # on warm-container reuse where asyncpg connections are loop-bound.
+        await engine.dispose()
 
 
 def handler(event, context):

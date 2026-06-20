@@ -7,6 +7,7 @@ from sqlalchemy import engine_from_config, pool
 from aiplatform.settings import settings
 from aiplatform.storage.models import Base
 import aiplatform.storage.radar_models  # noqa: F401 — registers radar tables with Base.metadata
+import aiplatform.storage.content_models  # noqa: F401 — registers linkedin_posts table with Base.metadata
 
 config = context.config
 

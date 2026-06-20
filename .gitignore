@@ -86,3 +86,9 @@ test_doc.txt
 # Infrastructure state — environment-specific, not committed
 infra/vpc_config.json
 infra/sns_config.json
+
+# Next.js (apps/knowledge_platform_ui/)
+node_modules/
+.next/
+out/
+.env.local
