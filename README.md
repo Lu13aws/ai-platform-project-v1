@@ -145,9 +145,16 @@ The `docker/postgres/init.sql` script enables the `vector` and `uuid-ossp` exten
 
 - Engine: PostgreSQL 16 with `pgvector` extension
 - Instance: `db.t3.micro`, eu-central-1, free tier
-- Endpoint: `ai-platform-db.cvs0uioe8sum.eu-central-1.rds.amazonaws.com:5432`
+- Identifier: `ai-platform-db-v2`
+- Endpoint: `ai-platform-db-v2.cvs0uioe8sum.eu-central-1.rds.amazonaws.com:5432`
+- VPC: `ai-platform-vpc` (private subnets — no public endpoint)
+- Security group: `sg-0ca46655eabaee9e7` — port 5432 from Lambda SG + developer IP only
 - Enable extensions on fresh RDS: `uv run python scripts/enable_extensions.py`
 - Run migrations against RDS: `uv run alembic upgrade head`
+
+> **Note:** RDS was migrated from the default VPC to `ai-platform-vpc` on 2026-06-20.
+> Lambda → RDS connections now stay within the private VPC network (no NAT Gateway roundtrip).
+> Local connections to RDS are no longer possible directly — use Lambda invoke or AWS SSM to connect.
 
 ### Amazon S3
 
@@ -749,6 +756,25 @@ uv run uvicorn apps.private_hub.main:app --reload --port 8001 --host 127.0.0.1
 - Reserved Lambda env vars (`AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`) caused `InvalidParameterValueException` — removed from all deploy scripts
 - Non-LLM Lambda failing settings validation: added `REQUIRE_LLM=false` feature flag to skip API key check for cleanup Lambda
 - `ensure_role()` return value bug in `deploy_cleanup.py` — fixed `role_arn` variable scope
+
+---
+
+### 20260620 — Infrastructure: RDS migrated to ai-platform-vpc
+
+**Completed:**
+- RDS instance `ai-platform-db-v2` (PostgreSQL 16, db.t3.micro) moved from default VPC to `ai-platform-vpc`
+- Private subnets only — `PubliclyAccessible: false`
+- New RDS security group `sg-0ca46655eabaee9e7` in `ai-platform-vpc`:
+  allows port 5432 from Lambda SG + developer home IP only
+- All 5 Lambda functions updated with new DATABASE_URL
+- Old instance `ai-platform-db` (default VPC) deleted
+- Snapshot `ai-platform-db-pre-migration` retained as backup
+
+**Result:**
+- Lambda → RDS connections stay within VPC private network (no NAT Gateway roundtrip)
+- Noticeably faster cold start / report load times (internal latency < 1ms vs ~20–50ms via NAT+internet)
+- No public endpoint on DB — significantly improved security posture
+- Local connections to RDS no longer possible directly (by design)
 
 ---
 
