@@ -217,7 +217,7 @@ def _render_html(report: dict) -> str:
           {url_part}
         </div>
         <div style="font-weight:600;color:#f1f5f9;font-size:0.88rem;margin-bottom:4px;">{_esc(s['title'])}</div>
-        <div style="color:#94a3b8;font-size:0.82rem;line-height:1.5;">{_esc(s['summary'])}</div>
+        <div style="color:#94a3b8;font-size:0.82rem;line-height:1.5;word-break:break-word;overflow-wrap:break-word;">{_esc(s['summary'])}</div>
       </div>"""
 
         companies_html += f"""
@@ -273,6 +273,12 @@ def _render_html(report: dict) -> str:
     h2 {{ font-size: 1.1rem; font-weight: 600; color: #f1f5f9;
           margin: 0 0 20px; border-left: 5px solid #334155; padding-left: 12px; }}
     footer {{ text-align: center; padding: 24px; color: #334155; font-size: 0.8rem; }}
+    @media (max-width: 640px) {{
+      header, .filters {{ padding-left: 16px; padding-right: 16px; }}
+      .stats {{ padding: 16px; gap: 16px; }}
+      main {{ padding: 20px 16px; }}
+      .stat .value {{ font-size: 1.4rem; }}
+    }}
   </style>
 </head>
 <body>
