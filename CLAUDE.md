@@ -15,6 +15,43 @@ The platform must be modular, reusable, cost-aware, and cloud-native. All future
 
 ---
 
+## Current Status (as of June 2026)
+
+### Live on AWS (eu-central-1)
+
+| Component | Status |
+|---|---|
+| Public RAG Demo API | ✅ Live — `https://72w6p1rx38.execute-api.eu-central-1.amazonaws.com` |
+| Technology Radar Pipeline | ✅ Live — weekly Lambda (Monday 06:00 UTC) |
+| Regulatory Radar Pipeline | ✅ Live — monthly Lambda (1st of month 07:00 UTC) |
+| Competitor Radar Pipeline | ✅ Live — weekly Lambda (Monday 08:00 UTC) |
+| Knowledge Platform (Agent Center, AI Chat, Skills Hub) | ✅ Live — same Lambda as RAG Demo |
+| Cleanup Pipeline | ✅ Live — monthly Lambda (1st of month 03:00 UTC) |
+| RDS PostgreSQL + pgvector | ✅ Live — private VPC (`ai-platform-vpc`), no public endpoint |
+| ECR Container Registry | ✅ Live — single shared image for all Lambda functions |
+
+### Deployed Agents
+
+| Agent | Purpose |
+|---|---|
+| CollectorAgent | RSS/HTML article collection for Technology Radar |
+| AnalyzerAgent | LLM classification into Adopt/Trial/Assess/Hold |
+| ChangeDetectionAgent | Detects category moves and new entries |
+| ReporterAgent | Generates JSON + HTML reports, uploads to S3 |
+| NotifierAgent | SNS email notifications per pipeline |
+| CleanupAgent | Retention enforcement (monthly) |
+| CompetitorCollectorAgent | Blog, pricing, financial, community signal collection |
+| CompetitorAnalyzerAgent | LLM signal classification by type/sentiment/impact |
+| CompetitorReporterAgent | Competitor report generation |
+| RegulatoryCollectorAgent | SHA-256 change detection on regulatory documents |
+| RegulatoryAnalyzerAgent | Diff-based LLM impact classification |
+| RegulatoryReporterAgent | Regulatory change report generation |
+| ReportIndexerAgent | Auto-indexes S3 reports into vector store after each pipeline run |
+| ContentCreatorAgent | LLM-generated LinkedIn posts from platform signals (built, not yet deployed) |
+| LinkedInPublisherAgent | LinkedIn API publisher (built, not yet deployed) |
+
+---
+
 ## Primary Goal
 
 Build a reusable AI platform capable of:
@@ -422,6 +459,27 @@ The demo must not use private or confidential documents.
 
 ---
 
+### Knowledge Platform
+
+Purpose:
+
+Internal AI-powered dashboard and chat interface for querying platform data.
+
+Components:
+
+* Agent Center — live status of all pipeline agents, last run timestamps
+* AI Chat — semantic search + grounded answers across all indexed content
+* Skills Hub — 55+ engineering skills indexed and queryable
+* Reports Dashboard — latest radar, competitor, and regulatory reports
+
+All pipeline reports are auto-indexed into the vector store via ReportIndexerAgent
+after each pipeline run. No manual indexing required.
+
+Data namespace: `app_name` column separates all data by application.
+Skills use `app_name = "skills_hub"`, reports use `app_name = "knowledge_platform"`.
+
+---
+
 ### Technology Radar
 
 Purpose:
@@ -537,108 +595,86 @@ Redshift is a data warehouse for analytical workloads. The MVP requires PostgreS
 
 ---
 
-## MVP Roadmap
+## Roadmap
 
-### Phase 1: Public RAG Demo
+### ✅ Phase 1: Public RAG Demo — COMPLETE
 
-Goal:
+Live at `https://72w6p1rx38.execute-api.eu-central-1.amazonaws.com`
 
-Build a public, no-login RAG demo using public documents.
-
-Must include:
-
-* document ingestion
-* chunking
-* embeddings
-* pgvector storage
-* retrieval
-* LLM answer generation
-* source references
-* basic UI
-* cost-aware processing
-* retention rules
+* Document ingestion (18 formats), chunking, embeddings, pgvector HNSW storage
+* Semantic retrieval + grounded LLM answers with source references
+* SHA-256 deduplication — unchanged documents never re-embedded
+* Retention rules enforced by monthly cleanup Lambda
 
 ---
 
-### Phase 2: Technology Radar
+### ✅ Phase 2: Technology Radar — COMPLETE
 
-Goal:
+Weekly Lambda pipeline (Monday 06:00 UTC), 50+ technologies tracked.
 
-Build scheduled monitoring for technology sources.
-
-Must include:
-
-* scheduled source collection
-* relevance classification
-* summaries
-* radar categories
-* dashboard output
-* retention of raw vs processed data
+* CollectorAgent → AnalyzerAgent (Adopt/Trial/Assess/Hold + sentiment) →
+  ChangeDetectionAgent → ReporterAgent → ReportIndexerAgent → NotifierAgent
+* Dark-themed HTML + JSON reports on S3, stable `latest.html` for portfolio embedding
+* SNS email notifications with change summaries
+* 24-month retention, monthly cleanup
 
 ---
 
-### Phase 3: Private Knowledge Hub
+### ✅ Phase 3: Private Knowledge Hub — COMPLETE (local)
 
-Goal:
+Local FastAPI app on `localhost:8001`, isolated from public API.
 
-Build a private knowledge retrieval system for personal project documents.
-
-Must include:
-
-* private data separation
-* no public exposure
-* document metadata
-* source-based answers
-* privacy-aware logging
+* 65+ personal documents indexed (CLAUDE.md, README, SKILL.md files)
+* `app_name = "private_hub"` scoping — never exposed via public endpoints
+* Note: direct DB access no longer possible after RDS VPC migration —
+  runs against local Docker PostgreSQL
 
 ---
 
-### Phase 4: Regulatory Radar
+### ✅ Phase 4: Regulatory Radar — COMPLETE
 
-Goal:
+Monthly Lambda pipeline (1st of month, 07:00 UTC), 6 sources monitored.
 
-Track regulatory and governance updates.
-
-Must include:
-
-* version-aware document processing
-* change detection
-* impact summaries
-* long-term retention for key findings
+* NIST CSF 2.0, OWASP Top 10, FINMA (auto) + EU AI Act, GDPR, FINMA Annual PDF (manual)
+* SHA-256 change detection, difflib-based LLM impact analysis
+* Permanent retention for regulatory documents and change history
 
 ---
 
-### Phase 5: Competitor Radar
+### ✅ Phase 5: Competitor Radar + Knowledge Platform — COMPLETE
 
-Goal:
+Weekly Lambda pipeline (Monday 08:00 UTC), 6 companies, 21 sources.
 
-Monitor public competitor information.
-
-Must include:
-
-* source monitoring
-* signal extraction
-* change detection
-* trend summaries
-* controlled scraping and retention
+* 4 signal types: product_announcement, pricing_change, financial_update, sentiment_event
+* ReportIndexerAgent: all pipeline reports auto-indexed after each run
+* Knowledge Platform UI (Next.js): Agent Center, AI Chat, Skills Hub, Reports Dashboard
+* ContentCreatorAgent + LinkedInPublisherAgent: built, not yet deployed
 
 ---
 
-### Phase 6: Corporate LLM Prototype
+### 🔄 Phase 6: Corporate LLM Prototype — PLANNED
 
-Goal:
+Compliance-first approach. Do NOT start implementation before completing
+the compliance mapping (NIST AI RMF × GDPR/DSG × current architecture).
 
-Extend the platform toward enterprise-ready knowledge retrieval.
+Compliance frameworks:
+* **NIST AI RMF** (primary) — Govern, Map, Measure, Manage
+* **GDPR / Swiss DSG** — data privacy, consent, deletion on request
+* **AWS Well-Architected Framework** — security pillar baseline
 
-Must include:
+Infrastructure requirements (separate from current shared stack):
+* Separate RDS instance for private/confidential data
+* Own VPC or strict VPC peering
+* Separate IAM roles per data class
+* Cognito for authentication + RBAC
+* Audit logging per user action (CloudTrail + application-level)
+* Retention policies per confidentiality class
+* Document classification
 
-* authentication
-* authorization
-* role-based access
-* audit logs
-* document classification
-* governance rules
-* retention by confidentiality class
+Future agents (after 6+ months of signal history):
+* Synthesis Agent (trend analysis + recommendations)
+* Strategic Advisor Agent (RAG-based Q&A for strategic decisions)
+* Executive Report Agent (aggregated monthly intelligence report)
 
 ---
 
@@ -662,17 +698,27 @@ Must include:
 
 The platform should evolve from a simple RAG demo into a reusable AI knowledge and monitoring platform capable of supporting enterprise-grade use cases.
 
-The first MVP is successful when:
+### ✅ MVP Success Criteria — ALL MET
 
-1. Public documents can be ingested.
-2. Chunks and embeddings are stored.
-3. A user can ask a question.
-4. The system retrieves relevant context.
-5. The LLM generates an answer.
-6. The answer includes source references.
-7. The system avoids unnecessary reprocessing.
-8. Raw and temporary data have retention rules.
-9. Monthly operating cost remains controlled.
+1. ✅ Public documents can be ingested.
+2. ✅ Chunks and embeddings are stored.
+3. ✅ A user can ask a question.
+4. ✅ The system retrieves relevant context.
+5. ✅ The LLM generates an answer.
+6. ✅ The answer includes source references.
+7. ✅ The system avoids unnecessary reprocessing (SHA-256 dedup + content-hash dedup).
+8. ✅ Raw and temporary data have retention rules (CleanupAgent, monthly Lambda).
+9. ✅ Monthly operating cost remains controlled (~$5–10/month on AWS free tier + spot usage).
+
+### Next Success Milestone — Phase 6
+
+Platform is enterprise-ready when:
+
+1. Private data is physically isolated from public data (separate RDS, VPC, IAM).
+2. All user actions are audit-logged.
+3. RBAC enforced via Cognito — users only access data within their permission scope.
+4. Compliance mapping against NIST AI RMF and GDPR/DSG is documented and verifiable.
+5. Data deletion on request is implemented and tested.
 
 ---
 
