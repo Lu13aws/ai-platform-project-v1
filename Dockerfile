@@ -21,4 +21,7 @@ EXPOSE 8000
 
 ENV PATH="/app/.venv/bin:$PATH"
 
-CMD ["uvicorn", "apps.rag_demo.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Lambda Runtime Interface Client — allows Lambda to call any handler via ImageConfig.Command.
+# For local dev, override entrypoint: docker run --entrypoint uvicorn image apps.rag_demo.main:app ...
+ENTRYPOINT ["/app/.venv/bin/python", "-m", "awslambdaric"]
+CMD ["apps.rag_demo.lambda_handler.handler"]
