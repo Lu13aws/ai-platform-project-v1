@@ -14,7 +14,7 @@ from apps.corp_api.api.schemas import (
     QueryResponse,
     SourcesResponse,
 )
-from apps.corp_api.auth.cognito import UserClaims, get_current_user, require_admin
+from apps.corp_api.auth.cognito import UserClaims, require_admin
 from apps.corp_api.services.corp_service import (
     delete_document,
     get_audit_log,
@@ -45,7 +45,7 @@ async def health_auth(user: UserClaims = Depends(get_current_user)) -> HealthRes
 async def query(
     request: QueryRequest,
     req: Request,
-    user: UserClaims = Depends(get_current_user),
+    user: UserClaims = Depends(require_admin),
     session: AsyncSession = Depends(get_corp_session_dep),
 ) -> QueryResponse:
     client_ip = req.client.host if req.client else None
@@ -65,7 +65,7 @@ async def ingest(
 
 @router.get("/sources", response_model=SourcesResponse)
 async def sources(
-    _: UserClaims = Depends(get_current_user),
+    _: UserClaims = Depends(require_admin),
     session: AsyncSession = Depends(get_corp_session_dep),
 ) -> SourcesResponse:
     return await get_sources(session)

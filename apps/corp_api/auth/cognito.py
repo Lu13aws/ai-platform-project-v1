@@ -24,11 +24,11 @@ class UserClaims:
 
     @property
     def is_admin(self) -> bool:
-        return "admin" in self.groups
+        return "corp-admins" in self.groups
 
     @property
     def is_demo_user(self) -> bool:
-        return "demo_user" in self.groups or self.is_admin
+        return "corp-admins" in self.groups
 
 
 def _parse_groups(raw: str | list | None) -> list[str]:

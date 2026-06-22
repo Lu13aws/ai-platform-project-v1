@@ -16,6 +16,8 @@ develop-eggs/
 .installed.cfg
 lib/
 lib64/
+# Unignore TypeScript src/lib directories
+!apps/**/src/lib/
 wheels/
 
 # Virtual environments
