@@ -38,16 +38,19 @@ def _save_credentials(sm_client, secret_name: str, creds: dict) -> None:
     )
 
 
-def _is_token_expired(creds: dict) -> bool:
+def _days_until_expiry(creds: dict) -> int:
     expires_at = creds.get("token_expires_at", "")
     if not expires_at:
-        return True
+        return 0
     try:
         exp = datetime.fromisoformat(expires_at)
-        # Refresh 7 days before expiry
-        return (exp - datetime.now(UTC)).days < 7
+        return max(0, (exp - datetime.now(UTC)).days)
     except Exception:
-        return True
+        return 0
+
+
+def _is_token_expired(creds: dict) -> bool:
+    return _days_until_expiry(creds) < 7
 
 
 def _refresh_access_token(creds: dict) -> dict:
@@ -87,8 +90,34 @@ class LinkedInPublisherAgent:
             print(f"  [linkedin] Could not load credentials: {exc}")
             return False
 
-        # Refresh token if close to expiry
+        days_left = _days_until_expiry(creds)
+        has_refresh = bool(creds.get("refresh_token"))
+
+        # Warn via SNS if token expires within 30 days and no refresh token available
+        if days_left <= 30 and not has_refresh and topic_arn:
+            subject = f"[AI Platform] LinkedIn token expires in {days_left} days — action required"
+            message = (
+                f"LinkedIn Access Token Expiry Warning\n"
+                f"{'=' * 40}\n\n"
+                f"Days remaining : {days_left}\n"
+                f"Expires at     : {creds.get('token_expires_at', 'unknown')}\n\n"
+                f"No refresh token is available. You must re-run the OAuth setup\n"
+                f"before the token expires to avoid losing LinkedIn publishing:\n\n"
+                f"  uv run python scripts/setup_linkedin_oauth.py\n"
+            )
+            try:
+                boto3.client("sns", region_name=settings.aws_region).publish(
+                    TopicArn=topic_arn, Subject=subject, Message=message
+                )
+                print(f"  [linkedin] Token expiry warning sent — {days_left} days left")
+            except Exception as exc:
+                print(f"  [linkedin] Could not send expiry warning: {exc}")
+
+        # Refresh token if close to expiry (only possible when refresh_token exists)
         if _is_token_expired(creds):
+            if not has_refresh:
+                print(f"  [linkedin] Token expired and no refresh token — cannot publish")
+                return False
             print("  [linkedin] Access token expiring — refreshing...")
             try:
                 creds = _refresh_access_token(creds)
