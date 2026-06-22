@@ -20,9 +20,13 @@ ai-platform-project-v1/
 │   ├── storage/            # SQLAlchemy models, async DB engine, S3 wrapper, radar models
 │   ├── ingestion/          # Document loaders, chunker, deduplication (hash-based)
 │   ├── retrieval/          # Embedder, pgvector search, hybrid retriever
+│   ├── storage/            # SQLAlchemy models: models.py, radar_models.py, competitor_models.py,
+│   │                       # regulatory_models.py, content_models.py (linkedin_posts + status)
 │   └── agents/             # CollectorAgent, AnalyzerAgent, ChangeDetectionAgent,
 │                           # ReporterAgent, NotifierAgent, CleanupAgent,
-│                           # ReportIndexerAgent (auto-indexes S3 reports into vector store)
+│                           # ReportIndexerAgent (auto-indexes S3 reports into vector store),
+│                           # ContentCreatorAgent (LinkedIn draft generation + regenerate),
+│                           # LinkedInPublisherAgent (LinkedIn API + Secrets Manager)
 ├── apps/
 │   ├── rag_demo/           # Phase 1 — Public RAG Demo FastAPI application
 │   │   ├── api/            # Routes, schemas, radar API endpoints
@@ -32,10 +36,12 @@ ai-platform-project-v1/
 │   ├── competitor_pipeline/ # Phase 5 — Weekly Lambda handler (Mon 08:00 UTC)
 │   ├── regulatory_pipeline/ # Phase 4 — Monthly Lambda handler (1st of month, 07:00 UTC)
 │   ├── knowledge_platform/ # Phase 3+ — Knowledge Hub API (skills, ingest-skill, agents, chat)
-│   ├── knowledge_platform_ui/ # Phase 6 — Next.js SPA deployed on platform.bridging-data.com
-│   │   ├── src/app/        # Pages: dashboard, chat, reports, agents, skills, corp, login
-│   │   ├── src/components/ # AppShell (auth guard), Sidebar (with logout)
-│   │   └── src/lib/        # api.ts, platform-auth.ts (public Cognito), corp-api.ts, auth.ts
+│   ├── content_creator/    # Content Creator Lambda — weekly draft generation (Thu 09:00 UTC)
+│   │   └── lambda_handler.py  # Runs ContentCreatorAgent only; publishing via UI review flow
+│   ├── knowledge_platform_ui/ # Phase 5+ — Next.js SPA deployed on platform.bridging-data.com
+│   │   ├── src/app/        # Pages: dashboard, chat, reports, agents, skills, linkedin, corp, login
+│   │   ├── src/components/ # AppShell (auth guard), Sidebar (corp-admin gated items)
+│   │   └── src/lib/        # api.ts, platform-auth.ts (Cognito + group claims), corp-api.ts
 │   ├── corp_api/           # Phase 6 — Corporate LLM API (Cognito-protected)
 │   │   ├── api/            # Routes (query, ingest, sources, audit, GDPR delete), schemas
 │   │   ├── auth/           # Cognito JWT parsing + RBAC (admin / demo_user)
@@ -199,9 +205,10 @@ The `docker/postgres/init.sql` script enables the `vector` and `uuid-ossp` exten
   - Audit log (admin): `GET /api/v1/corp/audit`
   - CORS: `https://platform.bridging-data.com`
 
-- **Frontend (Phase 6):** `https://platform.bridging-data.com`
+- **Frontend (Phase 5+):** `https://platform.bridging-data.com`
   - CloudFront → S3 static export (Next.js)
   - Cognito User Pool `ai-platform-public` — self-registration + email verification
+  - **Single Cognito pool** with `corp-admins` group for RBAC — LinkedIn Review + Corp Chat gated behind group membership (frontend guard + backend JWT check)
   - GitHub Actions auto-deploy on push to `main` (changes in `apps/knowledge_platform_ui/`)
 
 - Lambda (RAG demo + KP + Corp API): `ai-platform-rag-demo`, 512 MB, 60s timeout, container image
@@ -683,11 +690,10 @@ Then manually re-ingest the EU AI Act, GDPR, and FINMA PDFs using the steps abov
 
 ## Future Improvements
 
-### Content Creator + LinkedIn Publisher (planned)
-- `ContentCreatorAgent` — generates LinkedIn posts from weekly platform signals (domain rotation: Competitor / Technology)
-- `LinkedInPublisherAgent` — posts via LinkedIn API, saves URL + audit trail
-- Thursday 09:00 UTC EventBridge schedule
-- Agent Center integration with last post URL
+### LinkedIn OAuth Setup (one-time, required to activate Publish)
+- Create LinkedIn Developer App at developer.linkedin.com (scope: `w_member_social`)
+- Run `scripts/setup_linkedin_oauth.py` once — exchanges OAuth code for tokens, stores in Secrets Manager (`linkedin/credentials`)
+- After setup: Publish button in the LinkedIn Review UI becomes fully functional
 
 ### Infrastructure
 - CDK / Terraform for all AWS resources (currently manual scripts)
@@ -704,6 +710,36 @@ Then manually re-ingest the EU AI Act, GDPR, and FINMA PDFs using the steps abov
 ---
 
 ## Project Progress
+
+### 20260622 — LinkedIn Review UI + Auth consolidation + Security hardening
+
+**LinkedIn Review UI (full pipeline):**
+- `ContentCreatorAgent` extended with `regenerate()` — re-runs LLM with same company/domain/angle for one-click refresh in UI
+- `LinkedInPost.status` column added (`draft | published | rejected`) via Alembic migration `b3e7f2a1c9d5`; production RDS migrated via Lambda invoke (`{"action": "run_migrations"}`)
+- `apps/content_creator/lambda_handler.py` updated — generates draft only, no auto-publish; publishing is manual via the review UI
+- Backend: `apps/knowledge_platform/services/linkedin_service.py` — `list_posts`, `edit_post`, `regenerate_post`, `publish_post`, `reject_post`
+- Backend: 5 new routes under `/kp/linkedin/` (GET, PATCH, POST /regenerate, POST /publish, DELETE)
+- Frontend: `apps/knowledge_platform_ui/src/app/linkedin/page.tsx` — tabbed review UI (Drafts / Published / Rejected / All), inline edit, copy, regenerate, publish, reject actions per post
+
+**Cognito auth consolidation (single pool):**
+- Two separate Cognito user pools → one pool (`ai-platform-public`) with `corp-admins` group
+- `apps/corp_api/auth/cognito.py` — `is_admin` and `is_demo_user` now both check `"corp-admins" in groups`
+- `apps/knowledge_platform_ui/src/lib/platform-auth.ts` — `groups: string[]` stored in localStorage from `cognito:groups` JWT claim; `isCorpAdmin(auth)` helper; `decodeGroups()` decodes base64 JWT payload
+- Corp Chat page (`/corp`) rewritten — no separate login form; access granted/denied based on group claim
+- `apps/knowledge_platform/api/routes.py` — `/query` + `/sources` require `require_admin` dependency
+
+**Security hardening (LinkedIn endpoints):**
+- `_require_corp_admin` FastAPI dependency added to all 5 `/kp/linkedin/*` routes — decodes JWT `cognito:groups` claim, returns 403 if `corp-admins` not present
+- Frontend LinkedIn page adds `Authorization: Bearer {idToken}` header to all API calls
+- Sidebar: LinkedIn and Corp Chat items hidden for non-admin users (frontend group check)
+- Defence-in-depth: two independent layers (frontend guard + backend JWT check)
+
+**Bug fixes:**
+- CORS: `platform.bridging-data.com` missing from `_PRODUCTION_ORIGINS` in `apps/rag_demo/main.py` — POST requests (AI Chat, Corp Chat query) failed with `TypeError: Failed to fetch`
+- Dashboard: `Promise.all([api.stats(), api.recent()])` failed silently if either call errored — replaced with independent fetches + cleanup flag; removed hardcoded `localhost:8002` hint from error message
+- `apps/rag_demo/lambda_handler.py` extended with `{"action": "run_migrations"}` event — runs DDL directly against private VPC RDS when alembic.ini is not available in Lambda image
+
+---
 
 ### 20260622 — Phase 6 complete: Corporate LLM Prototype live on platform.bridging-data.com
 

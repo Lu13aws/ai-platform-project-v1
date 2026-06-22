@@ -1,12 +1,8 @@
 """
 Content Creator Pipeline Lambda handler.
 
-Runs the full Content Creator pipeline in sequence:
-  1. ContentCreatorAgent   — reads radar/competitor signals, LLM generates LinkedIn post
-  2. LinkedInPublisherAgent — posts to LinkedIn API, stores post URL, sends SNS summary
-
-Each agent runs in its own DB session so failures in later phases
-do not roll back earlier committed data.
+Runs ContentCreatorAgent weekly and saves the result as a draft.
+Publishing is handled manually via the LinkedIn Review UI on platform.bridging-data.com.
 
 Triggered by EventBridge weekly schedule (Thursday 09:00 UTC).
 """
@@ -16,41 +12,31 @@ import json
 import traceback
 
 from aiplatform.agents.content_creator_agent import ContentCreatorAgent
-from aiplatform.agents.linkedin_publisher_agent import LinkedInPublisherAgent
 from aiplatform.storage.database import get_async_session
 
 
 async def _run_pipeline() -> dict:
-    results: dict[str, str] = {}
-
-    print("[pipeline] phase 1/2 - content creator")
+    print("[pipeline] content creator — generating LinkedIn draft")
     async with get_async_session() as session:
         post = await ContentCreatorAgent().run(session)
-    results["content_creator"] = f"post generated: {post.company} ({post.domain}/{post.angle})"
-    print(f"[pipeline] content creator done: {results['content_creator']}")
 
-    print("[pipeline] phase 2/2 - linkedin publisher")
-    async with get_async_session() as session:
-        # Re-fetch post in new session so we can update it
-        from sqlalchemy import select
-        from aiplatform.storage.content_models import LinkedInPost
-        post_row = await session.get(LinkedInPost, post.id)
-        if post_row is None:
-            raise RuntimeError(f"Post {post.id} not found in new session")
-        publisher = LinkedInPublisherAgent()
-        success = await publisher.run(session, post_row)
-    results["linkedin_publisher"] = "published" if success else "failed (see logs)"
-    print(f"[pipeline] linkedin publisher done: {results['linkedin_publisher']}")
-
-    return results
+    return {
+        "post_id": str(post.id),
+        "company": post.company,
+        "domain": post.domain,
+        "angle": post.angle,
+        "status": post.status,
+        "chars": len(post.content),
+    }
 
 
 def handler(event, context):
     try:
-        results = asyncio.run(_run_pipeline())
+        result = asyncio.run(_run_pipeline())
+        print(f"[pipeline] draft saved: {result}")
         return {
             "statusCode": 200,
-            "body": json.dumps({"status": "ok", "results": results}),
+            "body": json.dumps({"status": "ok", "result": result}),
         }
     except Exception as exc:
         error_detail = traceback.format_exc()

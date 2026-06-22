@@ -105,12 +105,14 @@ export default function DashboardPage() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    Promise.all([api.stats(), api.recent()])
-      .then(([s, r]) => {
-        setStats(s)
-        setActivity(r.items)
-      })
-      .catch((e) => setError(String(e)))
+    let cancelled = false
+    api.stats()
+      .then((s) => { if (!cancelled) setStats(s) })
+      .catch((e) => { if (!cancelled) setError(String(e)) })
+    api.recent()
+      .then((r) => { if (!cancelled) setActivity(r.items) })
+      .catch(() => {})
+    return () => { cancelled = true }
   }, [])
 
   return (
@@ -122,8 +124,7 @@ export default function DashboardPage() {
 
       {error && (
         <div className="mb-6 p-4 bg-red-900/20 border border-red-800 rounded-lg text-red-400 text-sm">
-          Could not load data: {error}. Make sure the API server is running on{' '}
-          <code className="font-mono">localhost:8002</code>.
+          Could not load stats: {error}
         </div>
       )}
 

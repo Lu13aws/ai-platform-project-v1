@@ -58,7 +58,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <>
-      <Sidebar email={auth.email} onLogout={handleLogout} />
+      <Sidebar auth={auth} email={auth.email} onLogout={handleLogout} />
       <main className="flex-1 overflow-y-auto bg-slate-950">
         {children}
       </main>

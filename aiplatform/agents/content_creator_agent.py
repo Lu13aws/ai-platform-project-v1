@@ -135,6 +135,7 @@ class ContentCreatorAgent:
             angle=angle,
             company=company,
             content=post_content,
+            status="draft",
         )
         session.add(post)
         await session.flush()
@@ -148,6 +149,61 @@ class ContentCreatorAgent:
 
         print(f"[content_creator] post saved: {post.id}")
         return post
+
+    async def regenerate(self, session: AsyncSession, post: LinkedInPost) -> str:
+        """Re-run LLM with same company/domain/angle — returns new content string."""
+        if post.domain == "competitor":
+            _, signals_text = await self._competitor_signals_for(session, post.angle, post.company)
+        else:
+            _, signals_text = await self._radar_signals_for(session, post.angle, post.company)
+
+        provider = get_llm_provider()
+        user_msg = (
+            f"Company/Technology focus: {post.company}\n"
+            f"Topic angle: {_ANGLE_LABELS[post.domain][post.angle]}\n"
+            f"Domain: {post.domain}\n\n"
+            f"--- Signal data ---\n{signals_text}"
+        )
+        response = await provider.complete(
+            [Message(role="user", content=user_msg)],
+            system_prompt=_SYSTEM_PROMPT,
+        )
+        return response.content.strip()
+
+    async def _competitor_signals_for(self, session: AsyncSession, angle: str, company: str) -> tuple[str, str]:
+        type_map = {"product": "product_announcement", "pricing": "pricing_change",
+                    "financial": "financial_update", "sentiment": "sentiment_event"}
+        signal_type = type_map.get(angle, "product_announcement")
+        signals = await session.execute(
+            select(CompetitorSignal)
+            .where(CompetitorSignal.company_name == company)
+            .where(CompetitorSignal.signal_type == signal_type)
+            .order_by(CompetitorSignal.signal_date.desc()).limit(8)
+        )
+        rows = signals.scalars().all()
+        text = "\n\n".join(
+            f"[{r.signal_type}] {r.title}\n{r.summary}\nSentiment: {r.sentiment} | Impact: {r.impact_level}"
+            for r in rows
+        ) or "No recent signals found."
+        return company, text
+
+    async def _radar_signals_for(self, session: AsyncSession, angle: str, vendor: str) -> tuple[str, str]:
+        entries = await session.execute(
+            select(RadarEntry).where(RadarEntry.vendor == vendor)
+            .order_by(RadarEntry.last_updated_at.desc()).limit(5)
+        )
+        signals = await session.execute(
+            select(RadarSignal).where(RadarSignal.vendor == vendor)
+            .order_by(RadarSignal.signal_date.desc()).limit(8)
+        )
+        entries_text = "\n".join(
+            f"- {e.technology_name} [{e.category}] trend={e.trend}: {e.summary}"
+            for e in entries.scalars().all()
+        ) or "No radar entries found."
+        signals_text = "\n".join(
+            f"- [{r.category}] {r.signal_text[:300]}" for r in signals.scalars().all()
+        ) or "No recent signals."
+        return vendor, f"Radar Entries:\n{entries_text}\n\nRecent Signals:\n{signals_text}"
 
     async def _competitor_signals(self, session: AsyncSession, angle: str, state: dict) -> tuple[str, str]:
         # Pick next company round-robin from CompetitorSource

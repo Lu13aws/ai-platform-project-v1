@@ -94,6 +94,34 @@ class IngestSkillResponse(BaseModel):
     message: str
 
 
+class LinkedInPostItem(BaseModel):
+    id: str
+    domain: str
+    angle: str
+    company: str
+    content: str
+    status: str
+    linkedin_post_url: str | None
+    posted_at: datetime | None
+    created_at: datetime
+
+
+class LinkedInPostsResponse(BaseModel):
+    total: int
+    posts: list[LinkedInPostItem]
+
+
+class EditPostRequest(BaseModel):
+    content: str = Field(..., min_length=10)
+
+
+class PublishPostResponse(BaseModel):
+    id: str
+    status: str
+    linkedin_post_url: str | None
+    message: str
+
+
 __all__ = [
     "StatsResponse",
     "ActivityItem",

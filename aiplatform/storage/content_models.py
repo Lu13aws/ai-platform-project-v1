@@ -28,6 +28,8 @@ class LinkedInPost(Base):
     # angle: "product" | "pricing" | "sentiment" | "financial"
     company: Mapped[str] = mapped_column(String(100), nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="draft")
+    # status: "draft" | "published" | "rejected"
     linkedin_post_id: Mapped[str | None] = mapped_column(String(200), nullable=True)
     linkedin_post_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     posted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

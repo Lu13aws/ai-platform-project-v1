@@ -28,6 +28,7 @@ app = FastAPI(
 _PRODUCTION_ORIGINS = [
     "https://bridging-data.com",
     "https://www.bridging-data.com",
+    "https://platform.bridging-data.com",
     "http://localhost:3000",
     "http://localhost:3001",
 ]

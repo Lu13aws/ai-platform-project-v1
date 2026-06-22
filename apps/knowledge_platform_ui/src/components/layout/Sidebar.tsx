@@ -9,25 +9,34 @@ import {
   Bot,
   Cpu,
   Lock,
+  Linkedin,
   LogOut,
 } from 'lucide-react'
+import { isCorpAdmin, type PlatformAuth } from '@/lib/platform-auth'
 
-const NAV = [
-  { href: '/dashboard', label: 'Dashboard',  icon: LayoutDashboard },
-  { href: '/chat',      label: 'AI Chat',     icon: MessageSquare   },
-  { href: '/reports',   label: 'Reports',     icon: FileText        },
-  { href: '/agents',    label: 'Agents',      icon: Bot             },
-  { href: '/skills',    label: 'Skills Hub',  icon: Cpu             },
-  { href: '/corp',      label: 'Corp Chat',   icon: Lock            },
+const NAV_PUBLIC = [
+  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/chat',      label: 'AI Chat',   icon: MessageSquare   },
+  { href: '/reports',   label: 'Reports',   icon: FileText        },
+  { href: '/agents',    label: 'Agents',    icon: Bot             },
+  { href: '/skills',    label: 'Skills Hub',icon: Cpu             },
+]
+
+const NAV_ADMIN = [
+  { href: '/linkedin',  label: 'LinkedIn',  icon: Linkedin        },
+  { href: '/corp',      label: 'Corp Chat', icon: Lock            },
 ]
 
 interface SidebarProps {
+  auth?: PlatformAuth | null
   email?: string
   onLogout?: () => void
 }
 
-export default function Sidebar({ email, onLogout }: SidebarProps) {
+export default function Sidebar({ auth, email, onLogout }: SidebarProps) {
   const pathname = usePathname()
+  const admin = auth ? isCorpAdmin(auth) : false
+  const nav = admin ? [...NAV_PUBLIC, ...NAV_ADMIN] : NAV_PUBLIC
 
   return (
     <aside className="w-56 shrink-0 bg-slate-900 border-r border-slate-800 flex flex-col">
@@ -40,7 +49,7 @@ export default function Sidebar({ email, onLogout }: SidebarProps) {
 
       {/* Nav */}
       <nav className="flex-1 py-4 space-y-0.5 px-2">
-        {NAV.map(({ href, label, icon: Icon }) => {
+        {nav.map(({ href, label, icon: Icon }) => {
           const active = pathname === href
           return (
             <Link
