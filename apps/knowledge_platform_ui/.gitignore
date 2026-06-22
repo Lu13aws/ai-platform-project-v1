@@ -1,0 +1,13 @@
+# Build output
+.next/
+out/
+
+# Environment variables (contain API keys and secrets)
+.env.local
+.env*.local
+
+# TypeScript build cache
+tsconfig.tsbuildinfo
+
+# Dependencies
+node_modules/
