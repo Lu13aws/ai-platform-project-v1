@@ -1,0 +1,60 @@
+name: Deploy Platform UI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/knowledge_platform_ui/**'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: apps/knowledge_platform_ui/package-lock.json
+
+      - name: Install dependencies
+        working-directory: apps/knowledge_platform_ui
+        run: npm ci
+
+      - name: Build
+        working-directory: apps/knowledge_platform_ui
+        env:
+          NEXT_PUBLIC_API_BASE: ${{ secrets.PLATFORM_API_BASE }}
+          NEXT_PUBLIC_CORP_API_BASE: ${{ secrets.PLATFORM_CORP_API_BASE }}
+          NEXT_PUBLIC_PLATFORM_COGNITO_USER_POOL_ID: ${{ secrets.PLATFORM_COGNITO_USER_POOL_ID }}
+          NEXT_PUBLIC_PLATFORM_COGNITO_CLIENT_ID: ${{ secrets.PLATFORM_COGNITO_CLIENT_ID }}
+          NEXT_PUBLIC_PLATFORM_COGNITO_REGION: eu-central-1
+        run: npm run build
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: eu-central-1
+
+      - name: Deploy to S3
+        run: |
+          aws s3 sync apps/knowledge_platform_ui/out/ s3://platform.bridging-data.com/ \
+            --delete \
+            --cache-control "public, max-age=31536000, immutable" \
+            --exclude "*.html" \
+            --exclude "*.json"
+          aws s3 sync apps/knowledge_platform_ui/out/ s3://platform.bridging-data.com/ \
+            --delete \
+            --cache-control "no-cache, no-store, must-revalidate" \
+            --include "*.html" \
+            --include "*.json"
+
+      - name: Invalidate CloudFront
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id ${{ secrets.PLATFORM_CF_DISTRIBUTION_ID }} \
+            --paths "/*"

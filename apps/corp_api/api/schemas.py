@@ -64,6 +64,13 @@ class SourcesResponse(BaseModel):
     sources: list[SourceItem]
 
 
+class DeleteDocumentResponse(BaseModel):
+    document_id: UUID
+    source_uri: str
+    chunks_deleted: int
+    message: str
+
+
 class HealthResponse(BaseModel):
     status: str
     app: str

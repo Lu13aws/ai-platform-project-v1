@@ -8,17 +8,25 @@ import {
   FileText,
   Bot,
   Cpu,
+  Lock,
+  LogOut,
 } from 'lucide-react'
 
 const NAV = [
-  { href: '/dashboard', label: 'Dashboard',    icon: LayoutDashboard },
-  { href: '/chat',      label: 'AI Chat',       icon: MessageSquare   },
-  { href: '/reports',   label: 'Reports',       icon: FileText        },
-  { href: '/agents',    label: 'Agents',        icon: Bot             },
-  { href: '/skills',    label: 'Skills Hub',    icon: Cpu             },
+  { href: '/dashboard', label: 'Dashboard',  icon: LayoutDashboard },
+  { href: '/chat',      label: 'AI Chat',     icon: MessageSquare   },
+  { href: '/reports',   label: 'Reports',     icon: FileText        },
+  { href: '/agents',    label: 'Agents',      icon: Bot             },
+  { href: '/skills',    label: 'Skills Hub',  icon: Cpu             },
+  { href: '/corp',      label: 'Corp Chat',   icon: Lock            },
 ]
 
-export default function Sidebar() {
+interface SidebarProps {
+  email?: string
+  onLogout?: () => void
+}
+
+export default function Sidebar({ email, onLogout }: SidebarProps) {
   const pathname = usePathname()
 
   return (
@@ -51,9 +59,20 @@ export default function Sidebar() {
         })}
       </nav>
 
-      {/* Footer */}
-      <div className="px-4 py-3 border-t border-slate-800">
-        <p className="text-xs text-slate-600">Phase 6 — Local MVP</p>
+      {/* User + Logout */}
+      <div className="px-4 py-3 border-t border-slate-800 space-y-2">
+        {email && (
+          <p className="text-xs text-slate-500 truncate" title={email}>{email}</p>
+        )}
+        {onLogout && (
+          <button
+            onClick={onLogout}
+            className="flex items-center gap-2 text-xs text-slate-500 hover:text-slate-300 transition-colors w-full"
+          >
+            <LogOut size={12} />
+            Sign out
+          </button>
+        )}
       </div>
     </aside>
   )

@@ -36,7 +36,10 @@ def _parse_groups(raw: str | list | None) -> list[str]:
         return []
     if isinstance(raw, list):
         return raw
-    # Cognito returns space-separated groups as a string
+    # API Gateway serializes Cognito group arrays as "[group1 group2]" (with brackets)
+    raw = raw.strip()
+    if raw.startswith("[") and raw.endswith("]"):
+        raw = raw[1:-1]
     return [g.strip() for g in raw.split() if g.strip()]
 
 

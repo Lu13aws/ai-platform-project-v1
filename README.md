@@ -4,7 +4,9 @@
 
 Modular AI knowledge platform built on AWS using PostgreSQL + pgvector, FastAPI, and OpenAI / Anthropic LLMs.
 The system ingests structured and unstructured documents, chunks and embeds them, and retrieves grounded answers with source references in response to natural language questions.
-Designed as a reusable foundation for multiple applications — RAG demo, technology radar, regulatory radar, competitor radar, private knowledge hub, and a future corporate LLM prototype — all sharing the same ingestion, retrieval, and agent infrastructure.
+Designed as a reusable foundation for multiple applications — RAG demo, technology radar, regulatory radar, competitor radar, private knowledge hub, and a corporate LLM prototype — all sharing the same ingestion, retrieval, and agent infrastructure.
+
+**Live:** [platform.bridging-data.com](https://platform.bridging-data.com) — full Knowledge Platform with Cognito login (self-registration), Technology Radar, Competitor Intelligence, Regulatory Radar, AI Chat, Skills Hub, and Corporate Chat (Phase 6).
 
 ---
 
@@ -30,7 +32,15 @@ ai-platform-project-v1/
 │   ├── competitor_pipeline/ # Phase 5 — Weekly Lambda handler (Mon 08:00 UTC)
 │   ├── regulatory_pipeline/ # Phase 4 — Monthly Lambda handler (1st of month, 07:00 UTC)
 │   ├── knowledge_platform/ # Phase 3+ — Knowledge Hub API (skills, ingest-skill, agents, chat)
-│   ├── knowledge_platform_ui/ # Phase 3+ — Next.js multi-page SPA (AI Chat, Agent Center, Sources)
+│   ├── knowledge_platform_ui/ # Phase 6 — Next.js SPA deployed on platform.bridging-data.com
+│   │   ├── src/app/        # Pages: dashboard, chat, reports, agents, skills, corp, login
+│   │   ├── src/components/ # AppShell (auth guard), Sidebar (with logout)
+│   │   └── src/lib/        # api.ts, platform-auth.ts (public Cognito), corp-api.ts, auth.ts
+│   ├── corp_api/           # Phase 6 — Corporate LLM API (Cognito-protected)
+│   │   ├── api/            # Routes (query, ingest, sources, audit, GDPR delete), schemas
+│   │   ├── auth/           # Cognito JWT parsing + RBAC (admin / demo_user)
+│   │   ├── services/       # corp_service.py — query, ingest, delete, audit log
+│   │   └── lambda_handler.py # Mangum adapter + admin_action=setup_schema bootstrap
 │   ├── cleanup/            # Phase 2 — Monthly cleanup Lambda (retention enforcement)
 │   └── private_hub/        # Phase 3 — Private Knowledge Hub (local only, localhost:8001)
 │       ├── main.py         # FastAPI app: ingest, query, sources, stats, delete, UI
@@ -170,14 +180,31 @@ The `docker/postgres/init.sql` script enables the `vector` and `uuid-ossp` exten
 ### AWS Lambda + API Gateway (live)
 
 - **Public API:** `https://72w6p1rx38.execute-api.eu-central-1.amazonaws.com`
-- Health: `GET /health`
-- Docs: `GET /docs`
-- Query: `POST /api/v1/query`
-- Ingest: `POST /api/v1/ingest`
-- Radar entries: `GET /api/v1/radar/entries?category=Adopt`
-- Latest radar report: `GET /api/v1/radar/report/latest`
-- CORS: `https://bridging-data.com` (production), `*` (development)
-- Lambda (RAG demo): `ai-platform-rag-demo`, 512 MB, 60s timeout, container image
+  - Health: `GET /health`
+  - Docs: `GET /docs`
+  - Query: `POST /api/v1/query`
+  - Ingest: `POST /api/v1/ingest`
+  - Radar entries: `GET /api/v1/radar/entries?category=Adopt`
+  - Latest radar report: `GET /api/v1/radar/report/latest`
+  - CORS: `https://bridging-data.com`, `https://platform.bridging-data.com`
+
+- **Corporate API (Phase 6):** `https://3odo5043uh.execute-api.eu-central-1.amazonaws.com`
+  - All routes require `Authorization: Bearer <Cognito JWT>` (ai-platform-corp user pool)
+  - Health: `GET /api/v1/corp/health`
+  - Auth check: `GET /api/v1/corp/health/auth`
+  - Query (RAG): `POST /api/v1/corp/query`
+  - Ingest (admin): `POST /api/v1/corp/ingest`
+  - Sources: `GET /api/v1/corp/sources`
+  - GDPR erasure (admin): `DELETE /api/v1/corp/documents/{id}`
+  - Audit log (admin): `GET /api/v1/corp/audit`
+  - CORS: `https://platform.bridging-data.com`
+
+- **Frontend (Phase 6):** `https://platform.bridging-data.com`
+  - CloudFront → S3 static export (Next.js)
+  - Cognito User Pool `ai-platform-public` — self-registration + email verification
+  - GitHub Actions auto-deploy on push to `main` (changes in `apps/knowledge_platform_ui/`)
+
+- Lambda (RAG demo + KP + Corp API): `ai-platform-rag-demo`, 512 MB, 60s timeout, container image
 - Lambda (radar pipeline): `ai-platform-radar-pipeline`, 512 MB, 300s timeout, Monday 06:00 UTC
 - Lambda (competitor pipeline): `ai-platform-competitor-pipeline`, 512 MB, 300s timeout, Monday 08:00 UTC
 - Lambda (regulatory pipeline): `ai-platform-regulatory-pipeline`, 512 MB, 300s timeout, 1st of month 07:00 UTC
@@ -656,33 +683,63 @@ Then manually re-ingest the EU AI Act, GDPR, and FINMA PDFs using the steps abov
 
 ## Future Improvements
 
-### Phase 6 — Corporate LLM Prototype
-
-### Phase 6 — Corporate LLM Prototype
-- Authentication (AWS Cognito)
-- Role-based access control
-- Audit logging
-- Document classification by confidentiality class
+### Content Creator + LinkedIn Publisher (planned)
+- `ContentCreatorAgent` — generates LinkedIn posts from weekly platform signals (domain rotation: Competitor / Technology)
+- `LinkedInPublisherAgent` — posts via LinkedIn API, saves URL + audit trail
+- Thursday 09:00 UTC EventBridge schedule
+- Agent Center integration with last post URL
 
 ### Infrastructure
-- CDK / Terraform for all AWS resources (currently manual)
-- Full CI/CD pipeline with staging environment
-- CloudFront distribution for API caching
+- CDK / Terraform for all AWS resources (currently manual scripts)
 - WAF rules for rate limiting at edge
+- CloudWatch dashboards for query latency and embedding costs
 
 ### Portfolio Integration
-- Interactive RAG demo widget on bridging-data.com (`/[locale]/ai-demo/`)
-- Project card linking to demo from portfolio projects page
-- Multilingual widget UI (DE / EN / FR / IT)
+- Project card on bridging-data.com linking to platform.bridging-data.com
 
 ### Observability
 - Structured JSON logging with correlation IDs
-- CloudWatch dashboards for query latency and embedding costs
 - Alerting on LLM error rates and cost thresholds
 
 ---
 
 ## Project Progress
+
+### 20260622 — Phase 6 complete: Corporate LLM Prototype live on platform.bridging-data.com
+
+**Completed:**
+- **Corp RDS** (`ai-platform-db-corp`) — separate PostgreSQL + pgvector instance in `ai-platform-vpc`, no public endpoint. Tables: `documents`, `chunks`, `embeddings`, `audit_logs`
+- **Corp API Lambda** (`ai-platform-corp-api`) — FastAPI + Mangum, same shared ECR image, handler `apps.corp_api.lambda_handler`
+- **Corp API Gateway** (`3odo5043uh`) — HTTP API with Cognito JWT Authorizer (validates against `ai-platform-corp` user pool)
+- **RBAC** — `admin` group (ingest + query + audit + delete), `demo_user` group (query only); groups parsed from API Gateway JWT claims (bracket-stripping fix for `"[admin]"` serialization)
+- **Ingest endpoint** (`POST /corp/ingest`) — SHA-256 dedup, Chunker → TextChunk objects → OpenAI embeddings → Corp RDS
+- **Query endpoint** (`POST /corp/query`) — pgvector similarity search on Corp RDS → OpenAI LLM → grounded answer with sources
+- **GDPR Art. 17 deletion** (`DELETE /corp/documents/{id}`) — cascade delete (document → chunks → embeddings) + audit log entry
+- **Audit log** (`GET /corp/audit`) — every action logged (ingest, ingest_skip, query, delete) with user_id, email, resource, timestamp; optional `?user_id=` filter
+- **Cognito User Pools** — `ai-platform-corp` (admin only) + `ai-platform-public` (self-registration + email verification for platform visitors)
+- **Knowledge Platform UI** deployed on `https://platform.bridging-data.com`:
+  - Next.js static export → S3 (`platform.bridging-data.com`) → CloudFront → Route 53
+  - ACM wildcard cert `*.bridging-data.com` (us-east-1)
+  - AppShell auth guard (client-side, localStorage JWT, trailing-slash-normalized path check)
+  - Login page: Sign in + Create account + Email verification flow (direct Cognito API, no SDK)
+  - Corp Chat page: separate auth against `ai-platform-corp` user pool, Bearer token on all requests
+  - GitHub Actions CI/CD: push to `main` with changes in `apps/knowledge_platform_ui/` → auto-deploy
+- **Scripts**: `setup_corp_rds.py`, `setup_corp_cognito.py`, `setup_corp_schema.py`, `deploy_corp_api.py`, `setup_platform_cognito.py`, `setup_platform_cloudfront.py`, `test_corp_api.py`
+- **Compliance mapping**: `research/phase6/compliance_mapping.md` — NIST AI RMF × GDPR/DSG × AWS WAF
+
+**Key bugs fixed during implementation:**
+- `provider.name` → `provider.provider_name.value` (OpenAIProvider attribute)
+- `provider.chat()` → `provider.complete(messages=[Message(...)], system_prompt=...)` (correct method + dataclass)
+- `TextChunk` objects from `Chunker().split()` are dataclasses, not strings — use `.content`, `.chunk_index`, `.token_count`
+- `SearchResult` attributes are `.score` and `.source_uri`, not `.similarity` and `.title`
+- API Gateway serializes Cognito groups array as `"[admin]"` string — `_parse_groups()` strips brackets before splitting
+- `asyncio.run()` closes event loop — after `setup_schema`, restore with `asyncio.new_event_loop()` + `asyncio.set_event_loop()`
+- `trailingSlash: true` in Next.js config makes `/login` → `/login/` — normalize pathname before `PUBLIC_PATHS` check in AppShell
+- Login form left-aligned: `AppShell` returned `<>{children}</>` (fragment without width) inside flex body — fixed to `<div className="w-full">`
+- `ImageConfig.Command` (not `Handler`) required for container image Lambdas
+- `IdentitySource` in JWT Authorizer must be a list, not a string
+
+---
 
 ### 20260620 — Phase 5+: Auto-indexer integrated into all pipeline Lambdas
 
