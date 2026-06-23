@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Send, Loader2, ChevronDown, ChevronRight } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import { api, QueryResponse } from '@/lib/api'
 
 type Message =
@@ -135,7 +136,7 @@ function ChatPageInner() {
               <div className="max-w-3xl">
                 <div className="bg-slate-900 border border-slate-800 rounded-lg px-4 py-4">
                   <div className="prose prose-sm prose-invert max-w-none text-slate-300">
-                    <ReactMarkdown>{msg.response.answer}</ReactMarkdown>
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.response.answer}</ReactMarkdown>
                   </div>
                   {msg.response.model && (
                     <p className="text-xs text-slate-600 mt-2">

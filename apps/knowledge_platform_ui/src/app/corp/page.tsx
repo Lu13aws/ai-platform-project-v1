@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { Send, Loader2, Lock, ShieldOff, ChevronDown, ChevronRight } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import { getPlatformAuth, isCorpAdmin, type PlatformAuth } from '@/lib/platform-auth'
 import { corpQuery, type CorpQueryResponse } from '@/lib/corp-api'
 
@@ -123,7 +124,7 @@ function CorpChat({ auth }: { auth: PlatformAuth }) {
               <div className="max-w-3xl">
                 <div className="bg-slate-900 border border-slate-800 rounded-lg px-4 py-4">
                   <div className="prose prose-sm prose-invert max-w-none text-slate-300">
-                    <ReactMarkdown>{msg.response.answer}</ReactMarkdown>
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.response.answer}</ReactMarkdown>
                   </div>
                 </div>
                 <CorpSourcesPanel sources={msg.response.sources} />
