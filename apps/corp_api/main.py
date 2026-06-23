@@ -17,8 +17,9 @@ app.add_middleware(
         "http://localhost:3001",
         "https://bridging-data.com",
         "https://www.bridging-data.com",
+        "https://platform.bridging-data.com",
     ],
-    allow_methods=["GET", "POST"],
+    allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization"],
 )
 

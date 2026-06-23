@@ -14,7 +14,7 @@ from apps.corp_api.api.schemas import (
     QueryResponse,
     SourcesResponse,
 )
-from apps.corp_api.auth.cognito import UserClaims, require_admin
+from apps.corp_api.auth.cognito import UserClaims, get_current_user, require_admin
 from apps.corp_api.services.corp_service import (
     delete_document,
     get_audit_log,
