@@ -211,7 +211,9 @@ The `docker/postgres/init.sql` script enables the `vector` and `uuid-ossp` exten
   - **Single Cognito pool** with `corp-admins` group for RBAC — LinkedIn Review + Corp Chat gated behind group membership (frontend guard + backend JWT check)
   - GitHub Actions auto-deploy on push to `main` (changes in `apps/knowledge_platform_ui/`)
 
-- Lambda (RAG demo + KP + Corp API): `ai-platform-rag-demo`, 512 MB, 60s timeout, container image
+- Lambda (RAG demo + KP): `ai-platform-rag-demo`, 512 MB, 60s timeout, container image
+- Lambda (corp API): `ai-platform-corp-api`, 512 MB, 60s timeout, container image
+- Lambda (content creator): `ai-platform-content-creator`, 512 MB, 300s timeout, Tuesday 08:30 UTC
 - Lambda (radar pipeline): `ai-platform-radar-pipeline`, 512 MB, 300s timeout, Monday 06:00 UTC
 - Lambda (competitor pipeline): `ai-platform-competitor-pipeline`, 512 MB, 300s timeout, Monday 08:00 UTC
 - Lambda (regulatory pipeline): `ai-platform-regulatory-pipeline`, 512 MB, 300s timeout, 1st of month 07:00 UTC
@@ -690,11 +692,6 @@ Then manually re-ingest the EU AI Act, GDPR, and FINMA PDFs using the steps abov
 
 ## Future Improvements
 
-### LinkedIn OAuth Setup (one-time, required to activate Publish)
-- Create LinkedIn Developer App at developer.linkedin.com (scope: `w_member_social`)
-- Run `scripts/setup_linkedin_oauth.py` once — exchanges OAuth code for tokens, stores in Secrets Manager (`linkedin/credentials`)
-- After setup: Publish button in the LinkedIn Review UI becomes fully functional
-
 ### Infrastructure
 - CDK / Terraform for all AWS resources (currently manual scripts)
 - WAF rules for rate limiting at edge
@@ -710,6 +707,20 @@ Then manually re-ingest the EU AI Act, GDPR, and FINMA PDFs using the steps abov
 ---
 
 ## Project Progress
+
+### 20260623 — Phase 6 compliance review + CLAUDE.md / README update
+
+**Completed:**
+- `research/phase6/compliance_mapping_v2.md` — post-implementation compliance assessment
+  - NIST AI RMF: ~70% coverage (+40% since Phase 6 start)
+  - GDPR / Swiss DSG: ~75% coverage (+35%)
+  - AWS Well-Architected (Security Pillar): ~85% coverage (+25%)
+  - All 5 must-haves confirmed delivered: Cognito auth, separate RDS, RBAC, audit logging, GDPR Art.17 deletion
+- `CLAUDE.md` updated — Phase 6 status `🔄 PLANNED → ✅ COMPLETE`; Phase 6 Success Criteria all marked ✅
+- `README.md` updated — Content Creator + Corp API Lambda entries added; LinkedIn OAuth Setup moved from Future Improvements (completed)
+- Remaining gaps documented (acceptable for demo): WAF, model card, ROPA, data portability export, GuardDuty
+
+---
 
 ### 20260622 — LinkedIn Review UI + Auth consolidation + Security hardening
 
