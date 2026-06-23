@@ -36,7 +36,7 @@ _PRODUCTION_ORIGINS = [
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"] if settings.is_development else _PRODUCTION_ORIGINS,
-    allow_methods=["GET", "POST"],
+    allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization"],
 )
 
