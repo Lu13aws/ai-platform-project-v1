@@ -90,6 +90,10 @@ https://miro.com/app/board/uXjVHErgZ40=/?moveToWidget=3458764676069211957&cot=14
 
 https://miro.com/app/board/uXjVHErgZ40=/?moveToWidget=3458764675971998867&cot=14
 
+### Diagramms Phase 6 - Corporate LLM AI Knowledge Platform
+
+https://miro.com/app/board/uXjVHErgZ40=/?moveToWidget=3458764676201009164&cot=14
+
 ```
 Client (bridging-data.com / CLI)
 → AWS API Gateway
