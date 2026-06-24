@@ -2,16 +2,19 @@
 
 ## Project Overview
 
-This project is an AI Knowledge Platform designed to serve as the foundation for multiple AI-powered applications:
+This project is an AI Knowledge and Intelligence Platform — a self-sustaining system that autonomously collects, classifies, and synthesises signals across technology, competition, and regulation, and surfaces them through a unified knowledge interface.
+
+Applications built on the platform:
 
 * Public RAG Demo
 * Technology Radar
 * Regulatory Radar
 * Competitor Radar
 * Private Knowledge Hub
-* Future Corporate LLM Prototype
+* Corporate LLM Prototype (Phase 6 — live)
+* Intelligence Layer / Synthesis Engine (Phase 7 — planned Dec 2026)
 
-The platform must be modular, reusable, cost-aware, and cloud-native. All future applications should reuse the same ingestion, indexing, retrieval, scheduling, agent, and deployment infrastructure whenever possible.
+The platform must be modular, reusable, cost-aware, and cloud-native. All applications share the same ingestion, indexing, retrieval, scheduling, agent, and deployment infrastructure.
 
 ---
 
@@ -57,20 +60,23 @@ The platform must be modular, reusable, cost-aware, and cloud-native. All future
 
 ## Primary Goal
 
-Build a reusable AI platform capable of:
+Evolve from a monitoring and retrieval platform into a personal intelligence system that:
 
-1. Ingesting structured and unstructured documents
-2. Extracting metadata
-3. Creating embeddings
-4. Storing vectors
-5. Retrieving relevant context
-6. Generating grounded answers with source references
-7. Supporting agent workflows
-8. Supporting scheduled jobs
-9. Supporting hooks and event-driven automation
-10. Supporting retention policies and lifecycle management
-11. Supporting future authentication, authorization, and governance
-12. AI Platform should be published on my portfolio website www.bridging-data.com
+1. Ingests structured and unstructured documents across multiple domains
+2. Extracts metadata, creates embeddings, stores vectors
+3. Retrieves relevant context and generates grounded answers with source references
+4. Supports autonomous agent workflows — collection, classification, reporting, synthesis
+5. Supports scheduled jobs and event-driven automation
+6. Synthesises signals across domains (tech + competitor + regulatory) into insights
+7. Surfaces trends and patterns with evidence citations — not just raw data
+8. Supports retention policies and lifecycle management
+9. Supports authentication, authorization, RBAC, and audit logging (Phase 6+)
+10. Published as a live portfolio platform at www.bridging-data.com / platform.bridging-data.com
+
+**Directional note:** The platform collects and classifies today. The next milestone (Phase 7, Dec 2026)
+is synthesis — connecting signals across domains into actionable intelligence.
+Every synthesised insight must cite the specific source signal that supports it.
+Recommendations without evidence citations are not acceptable outputs.
 
 ---
 
@@ -186,8 +192,21 @@ Supported agent capabilities:
 * trend detection
 * content generation
 * document comparison
+* cross-domain synthesis (Phase 7)
+* strategic Q&A over aggregated signals (Phase 7)
+* executive reporting (Phase 7)
 
 Agents should be modular, reusable, and auditable.
+
+**Deployed agents (Phase 1–6):** CollectorAgent, AnalyzerAgent, ChangeDetectionAgent,
+ReporterAgent, NotifierAgent, CleanupAgent, CompetitorCollectorAgent, CompetitorAnalyzerAgent,
+CompetitorReporterAgent, RegulatoryCollectorAgent, RegulatoryAnalyzerAgent,
+RegulatoryReporterAgent, ReportIndexerAgent, ContentCreatorAgent, LinkedInPublisherAgent
+
+**Planned agents (Phase 7, earliest Dec 2026 — requires 6 months of signal history):**
+* SynthesisAgent — cross-domain trend detection across Radar + Competitor + Regulatory signals
+* StrategicAdvisorAgent — RAG-based Q&A over aggregated synthesis outputs
+* ExecutiveReportAgent — monthly consolidated intelligence brief → HTML/PDF → S3 → SNS
 
 ---
 
@@ -725,6 +744,37 @@ Platform is enterprise-ready:
 3. ✅ RBAC enforced via Cognito — `corp-admins` group required on all data endpoints.
 4. ✅ Compliance mapping against NIST AI RMF and GDPR/DSG documented and verified (`research/phase6/compliance_mapping_v2.md`).
 5. ✅ Data deletion on request implemented — `DELETE /corp/documents/{id}` with GDPR Art.17 audit trail.
+
+---
+
+### 🔄 Phase 7: Intelligence Layer — PLANNED (earliest: December 2026)
+
+**Prerequisite:** 6 months of weekly pipeline runs to accumulate sufficient signal history
+(minimum ~200 competitor signals, ~100 radar entries with movement history).
+
+**Design principles:**
+* Every synthesised insight must cite the specific source signal supporting it — no unsourced claims
+* Synthesis ≠ recommendations. The system surfaces patterns; humans decide what to do with them.
+* Output is clearly labelled as AI-generated from limited public data, not professional advice.
+
+**Agents to build:**
+* `SynthesisAgent` — runs monthly after all three pipelines complete. Detects cross-domain
+  patterns (e.g. "Anthropic: Hold on Tech Radar + pricing increase + regulatory scrutiny in same month").
+  Output: cross-domain JSON summary stored in DB + indexed into vector store.
+* `StrategicAdvisorAgent` — RAG-based Q&A over synthesis outputs. Answers "what should I watch
+  this month?" with grounded citations. Reuses existing vector store + LLM abstraction.
+* `ExecutiveReportAgent` — monthly HTML/PDF intelligence brief. LLM over synthesis output → S3 → SNS.
+
+**Scope boundary (what Phase 7 is NOT):**
+* Not a consulting tool. Not a recommendation engine. Not a decision-maker.
+* Consulting Accelerator (BA Agent, RE Agent, Proposal Generator) belongs in a separate repository
+  if built — it is a different product with different users, different data, and different risk profile.
+
+**Phase 7 Success Criteria:**
+1. SynthesisAgent produces cross-domain signal summaries with source citations
+2. StrategicAdvisorAgent answers "what changed this month?" with grounded answers
+3. ExecutiveReportAgent sends monthly brief via SNS with at least 3 cross-domain insights
+4. All insights traceable to specific DB records (no hallucinated patterns)
 
 ---
 
