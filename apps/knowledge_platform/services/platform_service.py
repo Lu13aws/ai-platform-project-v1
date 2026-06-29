@@ -34,15 +34,17 @@ _AGENT_REGISTRY = [
         "name": "Tech Radar Pipeline",
         "lambda_function": "ai-platform-radar-pipeline",
         "domain": "Technology",
-        "schedule": "Sunday 06:00 UTC",
+        "schedule": "Monday 06:00 UTC",
         "report_table": "radar",
+        "warning_days": 8,
     },
     {
         "name": "Regulatory Radar Pipeline",
         "lambda_function": "ai-platform-regulatory-pipeline",
         "domain": "Regulatory",
-        "schedule": "Sunday 07:00 UTC",
+        "schedule": "1st of month 07:00 UTC",
         "report_table": "regulatory",
+        "warning_days": 35,
     },
     {
         "name": "Competitor Radar Pipeline",
@@ -50,6 +52,7 @@ _AGENT_REGISTRY = [
         "domain": "Competitor",
         "schedule": "Monday 08:00 UTC",
         "report_table": "competitor",
+        "warning_days": 8,
     },
     {
         "name": "Cleanup Agent",
@@ -57,6 +60,7 @@ _AGENT_REGISTRY = [
         "domain": "Platform",
         "schedule": "1st of month 03:00 UTC",
         "report_table": None,
+        "warning_days": None,
     },
     {
         "name": "RAG Demo API",
@@ -64,6 +68,7 @@ _AGENT_REGISTRY = [
         "domain": "RAG",
         "schedule": "On-demand",
         "report_table": None,
+        "warning_days": None,
     },
     {
         "name": "Skill Extraction Agent",
@@ -71,6 +76,7 @@ _AGENT_REGISTRY = [
         "domain": "Skills",
         "schedule": "On-demand",
         "report_table": "heartbeat",
+        "warning_days": None,
     },
     {
         "name": "LinkedIn Publisher",
@@ -78,6 +84,7 @@ _AGENT_REGISTRY = [
         "domain": "Content",
         "schedule": "Tuesday 08:30 UTC",
         "report_table": "linkedin",
+        "warning_days": 8,
     },
 ]
 
@@ -274,16 +281,18 @@ async def get_agent_statuses(session: AsyncSession) -> list[AgentStatus]:
         "linkedin": last_linkedin,
     }
 
-    threshold = timedelta(days=8)
     now = datetime.now(UTC)
 
     statuses: list[AgentStatus] = []
     for agent in _AGENT_REGISTRY:
         last_run = last_runs.get(agent["report_table"]) if agent["report_table"] else None
+        warning_days = agent.get("warning_days")
 
         if last_run is None:
             status = "unknown"
-        elif (now - last_run) <= threshold:
+        elif warning_days is None:
+            status = "ok"  # on-demand: any recorded run = ok
+        elif (now - last_run) <= timedelta(days=warning_days):
             status = "ok"
         else:
             status = "warning"
