@@ -59,6 +59,7 @@ export interface AgentStatus {
   domain: string
   schedule: string
   last_run: string | null
+  last_indexed: string | null
   next_run: string
   status: 'ok' | 'warning' | 'unknown'
   last_post_url: string | null

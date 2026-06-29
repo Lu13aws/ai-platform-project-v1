@@ -58,6 +58,16 @@ function AgentCard({ agent }: { agent: AgentStatus }) {
               : '—'}
           </span>
         </div>
+        {agent.last_indexed !== undefined && agent.last_indexed !== null && (
+          <div className="flex items-center justify-between">
+            <span className="text-slate-500">Indexed</span>
+            <span className="text-slate-300">
+              {new Date(agent.last_indexed).toLocaleDateString('en-CH', {
+                day: '2-digit', month: 'short', year: 'numeric',
+              })}
+            </span>
+          </div>
+        )}
       </div>
 
       <div className="mt-4 pt-3 border-t border-slate-800 space-y-2">

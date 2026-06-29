@@ -26,8 +26,8 @@ SOURCES = [
     },
     {
         "company_name": "OpenAI",
-        "name": "OpenAI Pricing",
-        "url": "https://openai.com/api/pricing",
+        "name": "OpenAI API Pricing",
+        "url": "https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json",
         "source_type": "pricing",
     },
     {

@@ -37,6 +37,7 @@ _AGENT_REGISTRY = [
         "schedule": "Monday 06:00 UTC",
         "report_table": "radar",
         "warning_days": 8,
+        "index_prefix": "skill://radar/",
     },
     {
         "name": "Regulatory Radar Pipeline",
@@ -45,6 +46,7 @@ _AGENT_REGISTRY = [
         "schedule": "1st of month 07:00 UTC",
         "report_table": "regulatory",
         "warning_days": 35,
+        "index_prefix": "skill://regulatory/",
     },
     {
         "name": "Competitor Radar Pipeline",
@@ -53,6 +55,7 @@ _AGENT_REGISTRY = [
         "schedule": "Monday 08:00 UTC",
         "report_table": "competitor",
         "warning_days": 8,
+        "index_prefix": "skill://competitor/",
     },
     {
         "name": "Cleanup Agent",
@@ -61,6 +64,7 @@ _AGENT_REGISTRY = [
         "schedule": "1st of month 03:00 UTC",
         "report_table": None,
         "warning_days": None,
+        "index_prefix": None,
     },
     {
         "name": "RAG Demo API",
@@ -69,6 +73,7 @@ _AGENT_REGISTRY = [
         "schedule": "On-demand",
         "report_table": None,
         "warning_days": None,
+        "index_prefix": None,
     },
     {
         "name": "Skill Extraction Agent",
@@ -77,6 +82,7 @@ _AGENT_REGISTRY = [
         "schedule": "On-demand",
         "report_table": "heartbeat",
         "warning_days": None,
+        "index_prefix": None,
     },
     {
         "name": "LinkedIn Publisher",
@@ -85,6 +91,7 @@ _AGENT_REGISTRY = [
         "schedule": "Tuesday 08:30 UTC",
         "report_table": "linkedin",
         "warning_days": 8,
+        "index_prefix": None,
     },
 ]
 
@@ -299,12 +306,22 @@ async def get_agent_statuses(session: AsyncSession) -> list[AgentStatus]:
 
         last_post_url = last_linkedin_url if agent["report_table"] == "linkedin" else None
 
+        last_indexed: datetime | None = None
+        index_prefix = agent.get("index_prefix")
+        if index_prefix:
+            last_indexed = await session.scalar(
+                select(func.max(Document.updated_at)).where(
+                    Document.source_uri.like(f"{index_prefix}%")
+                )
+            )
+
         statuses.append(AgentStatus(
             name=agent["name"],
             lambda_function=agent["lambda_function"],
             domain=agent["domain"],
             schedule=agent["schedule"],
             last_run=last_run,
+            last_indexed=last_indexed,
             next_run=agent["schedule"],
             status=status,
             last_post_url=last_post_url,

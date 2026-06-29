@@ -46,6 +46,7 @@ class AgentStatus(BaseModel):
     domain: str
     schedule: str
     last_run: datetime | None
+    last_indexed: datetime | None = None
     next_run: str
     status: str        # "ok" | "warning" | "unknown"
     last_post_url: str | None = None
