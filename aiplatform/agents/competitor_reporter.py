@@ -216,8 +216,8 @@ def _render_html(report: dict) -> str:
           <span style="color:{sc};font-size:0.72rem;">&#9679; {_esc(s['sentiment'])}</span>
           {url_part}
         </div>
-        <div style="font-weight:600;color:#f1f5f9;font-size:0.88rem;margin-bottom:4px;">{_esc(s['title'])}</div>
-        <div style="color:#94a3b8;font-size:0.82rem;line-height:1.5;word-break:break-word;overflow-wrap:break-word;">{_esc(s['summary'])}</div>
+        <div style="font-weight:600;color:#f1f5f9;font-size:0.88rem;margin-bottom:4px;word-break:break-word;overflow-wrap:anywhere;">{_esc(s['title'])}</div>
+        <div style="color:#94a3b8;font-size:0.82rem;line-height:1.5;word-break:break-word;overflow-wrap:anywhere;">{_esc(s['summary'])}</div>
       </div>"""
 
         companies_html += f"""
@@ -276,8 +276,10 @@ def _render_html(report: dict) -> str:
     @media (max-width: 640px) {{
       header, .filters {{ padding-left: 16px; padding-right: 16px; }}
       .stats {{ padding: 16px; gap: 16px; }}
-      main {{ padding: 20px 16px; }}
+      main {{ padding: 20px 16px; max-width: 100%; overflow-x: hidden; }}
       .stat .value {{ font-size: 1.4rem; }}
+      .company-section {{ padding: 14px 12px !important; }}
+      .signal-card {{ padding: 10px 12px !important; }}
     }}
   </style>
 </head>
