@@ -691,6 +691,8 @@ Compliance documentation layer — all in `/compliance`:
 * `ACCEPTABLE_USE_POLICY.md` — permitted and prohibited uses
 * `INCIDENT_RESPONSE.md` — 72-hour breach notification procedure and severity levels
 * `SECURITY_CONTROLS.md` — maps all technical controls to framework requirements
+* `DATA_RETENTION.md` — plain-language retention summary for customer conversations
+* `AI_LIMITATIONS.md` — client-facing limitations and disclaimer document
 
 Infrastructure delivered (separate from public shared stack):
 * `ai-platform-db-corp` — separate RDS instance, encrypted, private VPC
