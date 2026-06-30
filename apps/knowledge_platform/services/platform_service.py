@@ -339,10 +339,8 @@ async def get_skills(session: AsyncSession) -> list[SkillItem]:
 
     skills: list[SkillItem] = []
     for doc in docs:
-        # Derive category from folder path (e.g. ".../ai/competitor_monitoring/SKILL.md" → "ai")
-        parts = doc.source_uri.replace("\\", "/").split("/")
-        skills_idx = next((i for i, p in enumerate(parts) if p == "skills"), None)
-        category = parts[skills_idx + 1] if skills_idx is not None and skills_idx + 1 < len(parts) else "other"
+        # Use stored metadata category; fall back to path parsing for legacy docs
+        category = (doc.doc_metadata or {}).get("category") or "other"
 
         skills.append(SkillItem(
             document_id=str(doc.id),
