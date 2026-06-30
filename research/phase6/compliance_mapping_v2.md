@@ -14,11 +14,11 @@ All five MVP items have been implemented. Several should-have items were also de
 Remaining gaps are documentation-level (model card, ROPA) and operational tooling (WAF, GuardDuty)
 which are acceptable for a portfolio demo context.
 
-| Framework | Coverage at Phase 6 start | Coverage now | Delta |
-|---|---|---|---|
-| NIST AI RMF | ~30% | ~70% | +40% |
-| GDPR / Swiss DSG | ~40% | ~75% | +35% |
-| AWS Well-Architected (Security) | ~60% | ~85% | +25% |
+| Framework | Coverage at Phase 6 start | Coverage after code | Coverage after /compliance docs | Delta total |
+|---|---|---|---|---|
+| NIST AI RMF | ~30% | ~70% | ~85% | +55% |
+| GDPR / Swiss DSG | ~40% | ~75% | ~85% | +45% |
+| AWS Well-Architected (Security) | ~60% | ~85% | ~85% | +25% |
 
 ---
 
@@ -191,16 +191,26 @@ Phase 6 Stack (isolated):
 
 ---
 
-## Remaining Gaps (Acceptable for Demo)
+## Remaining Gaps — Updated June 2026
+
+Documentation gaps from initial assessment have been resolved by creating the `/compliance` folder.
+
+| Gap | Status | Resolution |
+|---|---|---|
+| No model card document | ✅ Resolved | `compliance/MODEL_CARD.md` — models, versions, limitations, disclaimers |
+| OpenAI/Anthropic not formally documented as Art. 28 processors | ✅ Resolved | `compliance/PROCESSORS.md` — full Art. 28 sub-processor documentation |
+| No formal incident response plan | ✅ Resolved | `compliance/INCIDENT_RESPONSE.md` — 72h breach notification procedure |
+| No ROPA document | ✅ Resolved | `compliance/ROPA.md` — 7 processing activities, Art. 30 compliant |
+| No Acceptable Use Policy | ✅ Resolved | `compliance/ACCEPTABLE_USE_POLICY.md` — permitted/prohibited uses + disclaimers |
+| No security controls evidence map | ✅ Resolved | `compliance/SECURITY_CONTROLS.md` — all controls mapped to framework requirements |
+
+Remaining operational gaps (not blocking for demo):
 
 | Gap | Risk Level | Recommended Action |
 |---|---|---|
-| No WAF on Corp API Gateway | Medium | Add AWS WAF with rate limiting before customer demos |
-| No model card document | Low | Write a one-page doc: model used, version, known limitations |
-| OpenAI/Anthropic not formally documented as Art. 28 processors | Low | Add a paragraph to CLAUDE.md or a separate ROPA document |
+| No WAF on Corp API Gateway | Medium | Add AWS WAF with rate limiting before any real client accesses Corp API |
 | No data portability (export) endpoint | Low | Add `GET /corp/export` if customer requests it |
-| No formal incident response plan | Low | Acceptable for portfolio; required for production |
-| No GuardDuty | Low | Enable in production; not justified for demo cost |
+| No GuardDuty | Low | Enable for production; not justified for demo cost |
 | Right to access API (Art. 15) | Low | `GET /corp/sources` partially covers this |
 
 ---

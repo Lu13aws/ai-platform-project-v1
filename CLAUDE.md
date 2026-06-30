@@ -680,9 +680,17 @@ Compliance-first approach: compliance mapping completed before implementation
 (see `research/phase6/compliance_mapping.md` and `compliance_mapping_v2.md`).
 
 Compliance frameworks assessed:
-* **NIST AI RMF** — ~70% coverage (Govern, Map, Measure, Manage)
-* **GDPR / Swiss DSG** — ~75% coverage (Art. 5, Art. 17, Art. 32 implemented)
+* **NIST AI RMF** — ~85% coverage (Govern, Map, Measure, Manage + compliance docs)
+* **GDPR / Swiss DSG** — ~85% coverage (Art. 5, Art. 17, Art. 28, Art. 30, Art. 32 implemented)
 * **AWS Well-Architected Framework** — ~85% coverage (Security Pillar)
+
+Compliance documentation layer — all in `/compliance`:
+* `MODEL_CARD.md` — models, versions, limitations, disclaimers
+* `ROPA.md` — GDPR Art. 30 Record of Processing Activities (7 processing activities)
+* `PROCESSORS.md` — OpenAI, Anthropic, AWS, LinkedIn documented as Art. 28 sub-processors
+* `ACCEPTABLE_USE_POLICY.md` — permitted and prohibited uses
+* `INCIDENT_RESPONSE.md` — 72-hour breach notification procedure and severity levels
+* `SECURITY_CONTROLS.md` — maps all technical controls to framework requirements
 
 Infrastructure delivered (separate from public shared stack):
 * `ai-platform-db-corp` — separate RDS instance, encrypted, private VPC
