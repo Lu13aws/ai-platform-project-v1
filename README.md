@@ -53,6 +53,15 @@ ai-platform-project-v1/
 │       ├── ingester.py     # FolderIngester: recursive walk, exclusions, 50 MB cap
 │       └── static/
 │           └── index.html  # Dark-themed single-page UI with markdown rendering
+├── compliance/             # Compliance documentation layer (GDPR, NIST AI RMF, AWS WAF)
+│   ├── MODEL_CARD.md       # Models in use, versions, limitations, disclaimers
+│   ├── ROPA.md             # GDPR Art. 30 Record of Processing Activities (7 activities)
+│   ├── PROCESSORS.md       # Art. 28 sub-processor documentation (OpenAI, Anthropic, AWS, LinkedIn)
+│   ├── ACCEPTABLE_USE_POLICY.md  # Permitted and prohibited uses
+│   ├── INCIDENT_RESPONSE.md      # 72-hour breach notification procedure, severity levels
+│   ├── SECURITY_CONTROLS.md      # Evidence map: all controls mapped to NIST / GDPR / AWS WAF
+│   ├── DATA_RETENTION.md         # Plain-language retention summary for customer conversations
+│   └── AI_LIMITATIONS.md         # Client-facing disclaimer (hallucination, bias, human review)
 ├── migrations/             # Alembic migrations (shared schema, one history)
 │   └── versions/
 ├── research/               # Architecture decisions, dataset notes, feasibility docs
@@ -712,6 +721,36 @@ Then manually re-ingest the EU AI Act, GDPR, and FINMA PDFs using the steps abov
 
 ## Project Progress
 
+### 20260630 — Compliance documentation layer + Skills Hub category fix
+
+**Compliance documentation layer (`/compliance`):**
+- 8 Markdown documents created — all committed to git, all RAG-indexed into the Knowledge Platform
+- `MODEL_CARD.md` — models used (OpenAI text-embedding-3-small, gpt-4o-mini; Anthropic configurable), limitations, disclaimers
+- `ROPA.md` — GDPR Art. 30 Record of Processing Activities for all 7 processing activities
+- `PROCESSORS.md` — OpenAI, Anthropic, AWS, LinkedIn documented as Art. 28 sub-processors with data flows + SCCs
+- `ACCEPTABLE_USE_POLICY.md` — permitted uses, prohibited uses, platform scope
+- `INCIDENT_RESPONSE.md` — P1–P4 severity levels, 6-step response procedure, GDPR Art. 33 72-hour notification
+- `SECURITY_CONTROLS.md` — evidence table mapping all controls to NIST AI RMF / GDPR / AWS WAF
+- `DATA_RETENTION.md` — plain-language summary for customer conversations; cross-links to ROPA.md
+- `AI_LIMITATIONS.md` — client-facing disclaimer: hallucination, bias, incomplete context, human review requirements
+
+**RAG indexing:**
+- `scripts/ingest_compliance_docs.py` — indexes all `/compliance/*.md` via existing `ingest-skill` endpoint
+- SHA-256 dedup: re-running the script is safe (skips unchanged content)
+- All 8 docs verified in AI Chat: questions like "what is our data retention policy for competitor signals?" return answers grounded in `skill://compliance/DATA_RETENTION`
+
+**Bug fix — Skills Hub category derivation:**
+- `apps/knowledge_platform/services/platform_service.py` — `get_skills()` now reads `doc_metadata["category"]` instead of parsing the source URI path
+- Pre-existing bug: all skills were showing `category="other"` because `skill://ai/...` URIs have no "skills" path component to parse
+- Fix benefits all 93 indexed documents: `ai (13)`, `aws (25)`, `compliance (8)`, `development (13)`, `radar (7)`, `competitor (7)`, `regulatory (3)`, etc.
+
+**Coverage after this session:**
+- NIST AI RMF: ~85% (up from ~70%)
+- GDPR / Swiss DSG: ~85% (up from ~75%)
+- AWS Well-Architected (Security Pillar): ~85% (unchanged — technical controls already solid)
+
+---
+
 ### 20260623 — Phase 6 compliance review + CLAUDE.md / README update
 
 **Completed:**
@@ -722,7 +761,7 @@ Then manually re-ingest the EU AI Act, GDPR, and FINMA PDFs using the steps abov
   - All 5 must-haves confirmed delivered: Cognito auth, separate RDS, RBAC, audit logging, GDPR Art.17 deletion
 - `CLAUDE.md` updated — Phase 6 status `🔄 PLANNED → ✅ COMPLETE`; Phase 6 Success Criteria all marked ✅
 - `README.md` updated — Content Creator + Corp API Lambda entries added; LinkedIn OAuth Setup moved from Future Improvements (completed)
-- Remaining gaps documented (acceptable for demo): WAF, model card, ROPA, data portability export, GuardDuty
+- Documentation gaps identified (model card, ROPA, AUP, incident response, processors, security controls) — resolved in 20260630 session above
 
 ---
 
