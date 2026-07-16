@@ -202,7 +202,7 @@ def _render_html(report: dict) -> str:
             itc = _IMPACT_TEXT_COLORS.get(s["impact_level"], "#e2e8f0")
             sc = _SENTIMENT_COLORS.get(s["sentiment"], "#64748b")
             type_label = _SIGNAL_TYPE_LABELS.get(s["signal_type"], s["signal_type"])
-            url_part = f'<a href="{_esc(s["url"])}" style="color:#38bdf8;font-size:0.75rem;text-decoration:none;">source</a>' if s.get("url") else ""
+            url_part = f'<a href="{_esc(s["url"])}" target="_blank" rel="noopener noreferrer" style="color:#38bdf8;font-size:0.75rem;text-decoration:none;">source</a>' if s.get("url") else ""
             signal_cards += f"""
       <div class="signal-card"
            data-company="{_esc(company)}"
