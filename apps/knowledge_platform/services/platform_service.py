@@ -17,6 +17,7 @@ from aiplatform.storage.content_models import LinkedInPost
 from aiplatform.storage.models import Chunk, Document, Embedding
 from aiplatform.storage.radar_models import RadarReport, RadarSignal
 from aiplatform.storage.regulatory_models import RegulatoryChange, RegulatoryReport
+from aiplatform.storage.token_price_models import TokenPriceReport
 from apps.knowledge_platform.api.schemas import (
     ActivityItem,
     AgentHeartbeatRequest,
@@ -90,6 +91,15 @@ _AGENT_REGISTRY = [
         "domain": "Content",
         "schedule": "Tuesday 08:30 UTC",
         "report_table": "linkedin",
+        "warning_days": 8,
+        "index_prefix": None,
+    },
+    {
+        "name": "Token Price Radar",
+        "lambda_function": "ai-platform-token-price-pipeline",
+        "domain": "Pricing",
+        "schedule": "Monday 07:00 UTC",
+        "report_table": "token_price",
         "warning_days": 8,
         "index_prefix": None,
     },
@@ -280,12 +290,17 @@ async def get_agent_statuses(session: AsyncSession) -> list[AgentStatus]:
     last_linkedin = linkedin_row[0] if linkedin_row else None
     last_linkedin_url = linkedin_row[1] if linkedin_row else None
 
+    last_token_price = await session.scalar(
+        select(func.max(TokenPriceReport.generated_at))
+    )
+
     last_runs = {
         "radar": last_radar,
         "regulatory": last_regulatory,
         "competitor": last_competitor,
         "heartbeat": last_heartbeat,
         "linkedin": last_linkedin,
+        "token_price": last_token_price,
     }
 
     now = datetime.now(UTC)

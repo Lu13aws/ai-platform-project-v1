@@ -18,6 +18,7 @@ const DOMAIN_COLORS: Record<string, string> = {
   RAG:        'text-green-400',
   Skills:     'text-teal-400',
   Content:    'text-pink-400',
+  Pricing:    'text-yellow-400',
 }
 
 function AgentCard({ agent }: { agent: AgentStatus }) {
