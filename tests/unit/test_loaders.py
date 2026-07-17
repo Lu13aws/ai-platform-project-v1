@@ -10,7 +10,9 @@ from aiplatform.ingestion.loaders import (
     JSONLoader,
     TextLoader,
     get_loader,
+    validate_source_path,
 )
+from aiplatform.settings import settings
 
 
 def write_temp(suffix: str, content: str) -> Path:
@@ -74,3 +76,38 @@ def test_get_loader_returns_correct_loader():
 def test_get_loader_raises_for_unknown():
     with pytest.raises(ValueError, match="No loader available"):
         get_loader("file.xyz")
+
+
+def test_validate_source_path_accepts_path_inside_uploads_dir(monkeypatch, tmp_path):
+    monkeypatch.setattr(settings, "ingest_uploads_dir", str(tmp_path))
+    inside = tmp_path / "doc.txt"
+    inside.write_text("hello")
+
+    resolved = validate_source_path(str(inside))
+
+    assert resolved == inside.resolve()
+
+
+def test_validate_source_path_accepts_the_uploads_dir_itself(monkeypatch, tmp_path):
+    monkeypatch.setattr(settings, "ingest_uploads_dir", str(tmp_path))
+    assert validate_source_path(str(tmp_path)) == tmp_path.resolve()
+
+
+def test_validate_source_path_rejects_traversal_outside_uploads_dir(monkeypatch, tmp_path):
+    uploads_dir = tmp_path / "uploads"
+    uploads_dir.mkdir()
+    monkeypatch.setattr(settings, "ingest_uploads_dir", str(uploads_dir))
+
+    outside = uploads_dir / ".." / "secret.txt"
+
+    with pytest.raises(ValueError, match="must be inside"):
+        validate_source_path(str(outside))
+
+
+def test_validate_source_path_rejects_unrelated_absolute_path(monkeypatch, tmp_path):
+    uploads_dir = tmp_path / "uploads"
+    uploads_dir.mkdir()
+    monkeypatch.setattr(settings, "ingest_uploads_dir", str(uploads_dir))
+
+    with pytest.raises(ValueError, match="must be inside"):
+        validate_source_path(str(tmp_path / "other" / "file.py"))

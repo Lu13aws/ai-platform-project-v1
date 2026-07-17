@@ -94,6 +94,11 @@ class Settings(BaseSettings):
     max_chunks_per_doc: int = Field(default=500, ge=10)
     hash_algorithm: Literal["sha256", "sha512", "md5"] = "sha256"
 
+    # /tmp because Lambda's filesystem is read-only outside /tmp. Every
+    # IngestRequest.source_uri must resolve inside this directory — see
+    # aiplatform.ingestion.loaders.validate_source_path.
+    ingest_uploads_dir: str = Field(default="/tmp/ingest-uploads")
+
     @model_validator(mode="after")
     def validate_chunk_overlap(self) -> "Settings":
         if self.chunk_overlap >= self.chunk_size:

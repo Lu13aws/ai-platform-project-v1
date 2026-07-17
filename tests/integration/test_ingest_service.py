@@ -15,6 +15,20 @@ from apps.rag_demo.api.schemas import IngestRequest
 from apps.rag_demo.services.ingest_service import APP_NAME, IngestService
 
 
+@pytest.fixture(autouse=True)
+def _allow_tmp_path_as_upload_dir(monkeypatch, tmp_path):
+    """validate_source_path (aiplatform.ingestion.loaders) confines
+    source_uri to settings.ingest_uploads_dir — every test in this file
+    ingests from pytest's tmp_path, so make tmp_path the allowed root
+    instead of every test fighting the new check individually. Direct
+    attribute patch on the imported singleton, not an env var + cache_clear
+    — loaders.py already holds a reference to this same settings object
+    from its own `from aiplatform.settings import settings`, so mutating
+    the attribute here is visible there without needing a fresh instance.
+    """
+    monkeypatch.setattr(settings, "ingest_uploads_dir", str(tmp_path))
+
+
 @pytest.fixture
 async def db_session():
     engine = create_async_engine(settings.database_url, echo=False)

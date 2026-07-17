@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from aiplatform.ingestion.chunker import Chunker
 from aiplatform.ingestion.deduplication import content_changed, hash_content
-from aiplatform.ingestion.loaders import get_loader
+from aiplatform.ingestion.loaders import get_loader, validate_source_path
 from aiplatform.llm import get_llm_provider
 from aiplatform.retrieval.embedder import Embedder
 from aiplatform.storage.models import Chunk, Document, Embedding
@@ -21,7 +21,9 @@ class IngestService:
         self._app_name = app_name
 
     async def ingest(self, request: IngestRequest) -> IngestResponse:
-        # 1. Load document from source
+        # 1. Load document from source — validate first: source_uri must resolve
+        # inside settings.ingest_uploads_dir, or this raises ValueError (422).
+        validate_source_path(request.source_uri)
         loader = get_loader(request.source_uri)
         loaded_doc = await loader.load(request.source_uri)
 

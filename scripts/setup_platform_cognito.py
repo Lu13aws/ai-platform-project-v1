@@ -11,6 +11,19 @@ import boto3
 REGION = "eu-central-1"
 
 
+def get_or_create_group(cognito, pool_id: str, group_name: str, description: str) -> None:
+    try:
+        cognito.get_group(UserPoolId=pool_id, GroupName=group_name)
+        print(f"Group already exists: {group_name}")
+    except cognito.exceptions.ResourceNotFoundException:
+        cognito.create_group(
+            UserPoolId=pool_id,
+            GroupName=group_name,
+            Description=description,
+        )
+        print(f"Group created: {group_name}")
+
+
 def main() -> None:
     cognito = boto3.client("cognito-idp", region_name=REGION)
 
@@ -60,6 +73,14 @@ def main() -> None:
         )
         client_id = resp["UserPoolClient"]["ClientId"]
         print(f"Created app client: {client_id}")
+
+    # Admin group — gates the knowledge-platform management routes
+    # (LinkedIn review/publish, ingest-skill, cross-namespace query). Not
+    # auto-assigned to anyone; add specific users via the console or
+    # admin_add_user_to_group after running this.
+    get_or_create_group(
+        cognito, pool_id, "corp-admins", "Admin access to knowledge platform management routes"
+    )
 
     print("\n--- Add these to .env.local ---")
     print(f"NEXT_PUBLIC_PLATFORM_COGNITO_USER_POOL_ID={pool_id}")

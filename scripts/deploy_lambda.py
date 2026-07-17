@@ -29,6 +29,30 @@ ROLE_NAME = "ai-platform-lambda-role"
 _VPC_POLICY = "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
 _BASIC_POLICY = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 
+# Cognito — the *public* pool (apps/knowledge_platform + apps/rag_demo both
+# authenticate against this one; it is NOT the same pool apps/corp_api uses,
+# see scripts/deploy_corp_api.py / scripts/setup_platform_cognito.py).
+COGNITO_USER_POOL_ID = "eu-central-1_FPrGewp3l"
+COGNITO_CLIENT_ID = "52gsvhl73b3bvaigpmrfbknltq"
+COGNITO_ISSUER = f"https://cognito-idp.{REGION}.amazonaws.com/{COGNITO_USER_POOL_ID}"
+
+# Routes that must require a valid Cognito JWT: the 5 LinkedIn admin routes
+# plus the 3 previously-unauthenticated ingest/query routes. Everything else
+# (health checks, /docs, other rag_demo routes) stays on the quick-create
+# $default route at AuthorizationType=NONE — HTTP APIs let explicit routes
+# coexist with, and take precedence over, $default, so this list only needs
+# to name what actually requires auth.
+_PROTECTED_ROUTES = [
+    "GET /api/v1/kp/linkedin",
+    "PATCH /api/v1/kp/linkedin/{post_id}",
+    "POST /api/v1/kp/linkedin/{post_id}/regenerate",
+    "POST /api/v1/kp/linkedin/{post_id}/publish",
+    "DELETE /api/v1/kp/linkedin/{post_id}",
+    "POST /api/v1/kp/ingest-skill",
+    "POST /api/v1/kp/query",
+    "POST /api/v1/ingest",
+]
+
 
 def load_vpc_config() -> dict | None:
     path = Path("infra/vpc_config.json")
@@ -130,12 +154,12 @@ def deploy_lambda(lmb, role_arn: str, env_vars: dict[str, str], vpc: dict | None
     return fn["Configuration"]["FunctionArn"]
 
 
-def deploy_api_gateway(apigw, lmb, fn_arn: str) -> str:
+def deploy_api_gateway(apigw, lmb, fn_arn: str) -> tuple[str, str]:
     apis = apigw.get_apis()
     existing = next((a for a in apis["Items"] if a["Name"] == FUNCTION_NAME), None)
     if existing:
         print(f"  [ok] API already exists: {existing['ApiEndpoint']}")
-        return existing["ApiEndpoint"]
+        return existing["ApiId"], existing["ApiEndpoint"]
 
     api = apigw.create_api(
         Name=FUNCTION_NAME,
@@ -162,7 +186,77 @@ def deploy_api_gateway(apigw, lmb, fn_arn: str) -> str:
         SourceArn=f"arn:aws:execute-api:{REGION}:{ACCOUNT_ID}:{api_id}/*/*",
     )
     print(f"  [ok] API Gateway created: {api_url}")
-    return api_url
+    return api_id, api_url
+
+
+def create_or_get_authorizer(apigw, api_id: str) -> str:
+    authorizers = apigw.get_authorizers(ApiId=api_id)["Items"]
+    for auth in authorizers:
+        if auth["Name"] == "cognito-jwt":
+            print(f"  [apigw] authorizer already exists: {auth['AuthorizerId']}")
+            return auth["AuthorizerId"]
+
+    auth = apigw.create_authorizer(
+        ApiId=api_id,
+        Name="cognito-jwt",
+        AuthorizerType="JWT",
+        IdentitySource=["$request.header.Authorization"],
+        JwtConfiguration={
+            "Audience": [COGNITO_CLIENT_ID],
+            "Issuer": COGNITO_ISSUER,
+        },
+    )
+    auth_id = auth["AuthorizerId"]
+    print(f"  [apigw] JWT authorizer created: {auth_id}")
+    return auth_id
+
+
+def setup_protected_routes(apigw, lmb, api_id: str, auth_id: str, fn_arn: str) -> None:
+    # The quick-create integration from deploy_api_gateway should already
+    # cover this Lambda — reuse it if discoverable, same lookup-by-ARN
+    # deploy_corp_api.py's setup_routes uses. If it isn't (quick-create's
+    # integration doesn't always behave like an explicitly-created one),
+    # fall back to creating a second integration pointed at the same
+    # function rather than failing — HTTP APIs allow more than one
+    # integration per Lambda, and $default keeps using whichever one it
+    # already has.
+    integrations = apigw.get_integrations(ApiId=api_id)["Items"]
+    integration_id = next(
+        (i["IntegrationId"] for i in integrations if fn_arn in i.get("IntegrationUri", "")),
+        None,
+    )
+    if integration_id is None:
+        integ = apigw.create_integration(
+            ApiId=api_id,
+            IntegrationType="AWS_PROXY",
+            IntegrationUri=fn_arn,
+            PayloadFormatVersion="2.0",
+        )
+        integration_id = integ["IntegrationId"]
+        print(f"  [apigw] integration created: {integration_id}")
+        lmb.add_permission(
+            FunctionName=FUNCTION_NAME,
+            StatementId="apigateway-invoke-protected",
+            Action="lambda:InvokeFunction",
+            Principal="apigateway.amazonaws.com",
+            SourceArn=f"arn:aws:execute-api:{REGION}:{ACCOUNT_ID}:{api_id}/*/*",
+        )
+    else:
+        print(f"  [apigw] integration already exists: {integration_id}")
+
+    existing_routes = {r["RouteKey"] for r in apigw.get_routes(ApiId=api_id)["Items"]}
+    for route_key in _PROTECTED_ROUTES:
+        if route_key in existing_routes:
+            print(f"  [apigw] route exists: {route_key}")
+            continue
+        apigw.create_route(
+            ApiId=api_id,
+            RouteKey=route_key,
+            Target=f"integrations/{integration_id}",
+            AuthorizationType="JWT",
+            AuthorizerId=auth_id,
+        )
+        print(f"  [apigw] route created: {route_key} (auth=JWT)")
 
 
 def main() -> None:
@@ -186,7 +280,15 @@ def main() -> None:
 
     print("\n=== Step 3: API Gateway HTTP API ===")
     try:
-        api_url = deploy_api_gateway(apigw, lmb, fn_arn)
+        api_id, api_url = deploy_api_gateway(apigw, lmb, fn_arn)
+    except Exception as exc:
+        print(f"  [error] {type(exc).__name__}: {exc}", file=sys.stderr)
+        sys.exit(1)
+
+    print("\n=== Step 4: Cognito JWT authorizer on sensitive routes ===")
+    try:
+        auth_id = create_or_get_authorizer(apigw, api_id)
+        setup_protected_routes(apigw, lmb, api_id, auth_id, fn_arn)
     except Exception as exc:
         print(f"  [error] {type(exc).__name__}: {exc}", file=sys.stderr)
         sys.exit(1)

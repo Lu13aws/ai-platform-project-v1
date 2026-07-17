@@ -1,84 +1,13 @@
 """
 Cognito JWT authentication for the Corporate API.
 
-Production (Lambda + API Gateway):
-  API Gateway JWT Authorizer validates the token — Lambda reads pre-validated claims
-  from the API Gateway event context.
-
-Local development:
-  Set AUTH_BYPASS=true to skip auth (admin identity assumed).
-  Or send a valid Cognito JWT as Authorization: Bearer <token>.
+Moved to aiplatform/auth/cognito.py — the logic is pool-agnostic (it only
+trusts whatever claims API Gateway's JWT authorizer already validated), so
+it's shared with apps/knowledge_platform and apps/rag_demo rather than
+duplicated per app. Re-exported here so existing imports in this app keep
+working unchanged.
 """
 
-import os
-from dataclasses import dataclass, field
+from aiplatform.auth.cognito import UserClaims, get_current_user, require_admin
 
-from fastapi import Depends, HTTPException, Request, status
-
-
-@dataclass
-class UserClaims:
-    user_id: str
-    email: str
-    groups: list[str] = field(default_factory=list)
-
-    @property
-    def is_admin(self) -> bool:
-        return "corp-admins" in self.groups
-
-    @property
-    def is_demo_user(self) -> bool:
-        return "corp-admins" in self.groups
-
-
-def _parse_groups(raw: str | list | None) -> list[str]:
-    if not raw:
-        return []
-    if isinstance(raw, list):
-        return raw
-    # API Gateway serializes Cognito group arrays as "[group1 group2]" (with brackets)
-    raw = raw.strip()
-    if raw.startswith("[") and raw.endswith("]"):
-        raw = raw[1:-1]
-    return [g.strip() for g in raw.split() if g.strip()]
-
-
-async def get_current_user(request: Request) -> UserClaims:
-    # Production: API Gateway JWT Authorizer injects validated claims into event context
-    apigw_event = request.scope.get("aws.event", {})
-    if apigw_event:
-        claims = (
-            apigw_event
-            .get("requestContext", {})
-            .get("authorizer", {})
-            .get("jwt", {})
-            .get("claims", {})
-        )
-        if claims:
-            return UserClaims(
-                user_id=claims.get("sub", ""),
-                email=claims.get("email", ""),
-                groups=_parse_groups(claims.get("cognito:groups")),
-            )
-
-    # Local development bypass
-    if os.environ.get("AUTH_BYPASS", "").lower() == "true":
-        return UserClaims(
-            user_id="dev-user-local",
-            email="dev@local",
-            groups=["admin"],
-        )
-
-    raise HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Not authenticated. Set AUTH_BYPASS=true for local development.",
-    )
-
-
-async def require_admin(user: UserClaims = Depends(get_current_user)) -> UserClaims:
-    if not user.is_admin:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Admin access required.",
-        )
-    return user
+__all__ = ["UserClaims", "get_current_user", "require_admin"]

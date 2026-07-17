@@ -10,6 +10,7 @@ from io import StringIO
 from pathlib import Path
 
 from aiplatform.ingestion.base import DocumentLoader, LoadedDocument
+from aiplatform.settings import settings
 
 
 class PDFLoader(DocumentLoader):
@@ -304,6 +305,23 @@ _LOADERS: list[DocumentLoader] = [
     ExcelLoader(),
     CodeFileLoader(),
 ]
+
+
+def validate_source_path(source_uri: str) -> Path:
+    """Resolve source_uri and confirm it falls inside settings.ingest_uploads_dir.
+
+    Every loader below reads a local path (Path(source).read_text() or an
+    equivalent local-file open) — none fetches a remote URL — so confining
+    source_uri to one designated upload directory is the fix for arbitrary
+    local file disclosure via ingestion, not scheme/URL handling. Raises
+    ValueError (not a bare assertion) since callers already map ValueError
+    to HTTP 422.
+    """
+    uploads_root = Path(settings.ingest_uploads_dir).resolve()
+    resolved = Path(source_uri).resolve()
+    if resolved != uploads_root and uploads_root not in resolved.parents:
+        raise ValueError(f"source_uri must be inside {uploads_root}")
+    return resolved
 
 
 def get_loader(source: str | Path) -> DocumentLoader:
