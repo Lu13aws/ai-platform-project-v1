@@ -158,6 +158,29 @@ Responsibilities:
 
 All generated answers should include source references whenever possible.
 
+**Current RAG architecture: Standard RAG (single-pass)**
+
+The platform implements Standard RAG — not Agentic RAG. The query flow is:
+
+1. Query → embedding → pgvector similarity search (HNSW)
+2. Top-K chunks retrieved as context
+3. LLM generates a grounded answer with source references
+4. Response returned — single pass, no loops
+
+What is intentionally absent (and belongs in Phase 7, not before):
+
+* Query rewriting / reformulation loop
+* Relevance check ("is the answer good enough?")
+* Multi-source routing (Vector DB + external APIs + live internet)
+* Iterative retrieval until sufficient context is found
+
+This is the right architecture for the current use case: documents are well-structured,
+queries are precise, and single-pass retrieval produces reliable results.
+Agentic RAG patterns (self-correcting loops, multi-source routing) become relevant
+in Phase 7 when the StrategicAdvisorAgent needs to answer open-ended questions like
+"what should I watch this month?" — where the first retrieval pass is unlikely to
+return sufficient context without iteration.
+
 ---
 
 ### LLM Layer
@@ -773,6 +796,9 @@ Platform is enterprise-ready:
   Output: cross-domain JSON summary stored in DB + indexed into vector store.
 * `StrategicAdvisorAgent` — RAG-based Q&A over synthesis outputs. Answers "what should I watch
   this month?" with grounded citations. Reuses existing vector store + LLM abstraction.
+  **Note:** This agent is where Agentic RAG patterns first become relevant — open-ended queries
+  like "what should I watch this month?" require query rewriting, relevance checking, and
+  potentially multi-source routing. The current single-pass Standard RAG is insufficient here.
 * `ExecutiveReportAgent` — monthly HTML/PDF intelligence brief. LLM over synthesis output → S3 → SNS.
 
 **Scope boundary (what Phase 7 is NOT):**
