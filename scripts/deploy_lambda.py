@@ -17,7 +17,7 @@ import time
 from pathlib import Path
 
 import boto3
-
+from _secrets import ensure_secret_merged, grant_secret_read
 from aiplatform.settings import settings
 
 ACCOUNT_ID = "759302162548"
@@ -25,6 +25,11 @@ REGION = "eu-central-1"
 FUNCTION_NAME = "ai-platform-rag-demo"
 ECR_IMAGE = f"{ACCOUNT_ID}.dkr.ecr.{REGION}.amazonaws.com/ai-platform-rag-demo:lambda"
 ROLE_NAME = "ai-platform-lambda-role"
+
+# Shared across all non-corp Lambdas — see scripts/_secrets.py and
+# aiplatform/secrets.py (which reads this same secret at cold start).
+APP_SECRET_NAME = "ai-platform/app-secrets"
+APP_SECRET_POLICY_NAME = "AppSecretsAccess"
 
 _VPC_POLICY = "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
 _BASIC_POLICY = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
@@ -37,11 +42,14 @@ COGNITO_CLIENT_ID = "52gsvhl73b3bvaigpmrfbknltq"
 COGNITO_ISSUER = f"https://cognito-idp.{REGION}.amazonaws.com/{COGNITO_USER_POOL_ID}"
 
 # Routes that must require a valid Cognito JWT: the 5 LinkedIn admin routes
-# plus the 3 previously-unauthenticated ingest/query routes. Everything else
-# (health checks, /docs, other rag_demo routes) stays on the quick-create
+# plus the ingest routes. Everything else (health checks, /docs, /kp/query for
+# the public AI Chat, other rag_demo routes) stays on the quick-create
 # $default route at AuthorizationType=NONE — HTTP APIs let explicit routes
 # coexist with, and take precedence over, $default, so this list only needs
 # to name what actually requires auth.
+# NOTE: /kp/query is deliberately NOT here — the AI Chat on
+# platform.bridging-data.com is a public portfolio feature and the frontend
+# sends no Authorization header.
 _PROTECTED_ROUTES = [
     "GET /api/v1/kp/linkedin",
     "PATCH /api/v1/kp/linkedin/{post_id}",
@@ -49,7 +57,6 @@ _PROTECTED_ROUTES = [
     "POST /api/v1/kp/linkedin/{post_id}/publish",
     "DELETE /api/v1/kp/linkedin/{post_id}",
     "POST /api/v1/kp/ingest-skill",
-    "POST /api/v1/kp/query",
     "POST /api/v1/ingest",
 ]
 
@@ -98,9 +105,6 @@ def create_or_get_role(iam, use_vpc: bool) -> str:
 def build_env_vars() -> dict[str, str]:
     return {
         "APP_ENV": "production",
-        "DATABASE_URL": settings.database_url,
-        "ALEMBIC_DATABASE_URL": settings.alembic_database_url,
-        "OPENAI_API_KEY": settings.openai_api_key.get_secret_value(),
         "LLM_PROVIDER": settings.llm_provider,
         "OPENAI_CHAT_MODEL": settings.openai_chat_model,
         "OPENAI_EMBEDDING_MODEL": settings.openai_embedding_model,
@@ -108,6 +112,22 @@ def build_env_vars() -> dict[str, str]:
         "RETRIEVAL_SIMILARITY_THRESHOLD": str(settings.retrieval_similarity_threshold),
         "MAX_CHUNKS_PER_DOC": str(settings.max_chunks_per_doc),
     }
+
+
+def sync_app_secret(sm, iam) -> None:
+    """DATABASE_URL/ALEMBIC_DATABASE_URL/OPENAI_API_KEY move from cleartext
+    Environment.Variables into Secrets Manager — aiplatform/secrets.py
+    fetches them back into the environment at Lambda cold start."""
+    secret_arn = ensure_secret_merged(
+        sm,
+        APP_SECRET_NAME,
+        {
+            "DATABASE_URL": settings.database_url,
+            "ALEMBIC_DATABASE_URL": settings.alembic_database_url,
+            "OPENAI_API_KEY": settings.openai_api_key.get_secret_value(),
+        },
+    )
+    grant_secret_read(iam, ROLE_NAME, APP_SECRET_POLICY_NAME, secret_arn)
 
 
 def build_vpc_config(vpc: dict) -> dict:
@@ -263,12 +283,16 @@ def main() -> None:
     iam = boto3.client("iam", region_name=REGION)
     lmb = boto3.client("lambda", region_name=REGION)
     apigw = boto3.client("apigatewayv2", region_name=REGION)
+    sm = boto3.client("secretsmanager", region_name=REGION)
 
     print("\n=== Step 0: VPC config ===")
     vpc = load_vpc_config()
 
     print("\n=== Step 1: IAM execution role ===")
     role_arn = create_or_get_role(iam, use_vpc=vpc is not None)
+
+    print("\n=== Step 1b: App secret (Secrets Manager) ===")
+    sync_app_secret(sm, iam)
 
     print("\n=== Step 2: Lambda function ===")
     env_vars = build_env_vars()
