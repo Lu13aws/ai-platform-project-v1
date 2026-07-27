@@ -73,13 +73,11 @@ async def skills(session: AsyncSession = Depends(get_session)) -> SkillsResponse
     return SkillsResponse(total=len(items), skills=items)
 
 
-@router.post("/query", response_model=QueryResponse, dependencies=[Depends(require_admin)])
+@router.post("/query", response_model=QueryResponse)
 async def query(
     request: QueryRequest,
     session: AsyncSession = Depends(get_session),
 ) -> QueryResponse:
-    # app_name=None searches across every namespace — a deliberately elevated,
-    # cross-tenant capability, hence admin-only rather than any authenticated user.
     service = QueryService(session, app_name=None)
     return await service.query(request)
 
