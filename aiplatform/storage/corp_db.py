@@ -48,6 +48,7 @@ corp_engine = create_async_engine(
     _CORP_DATABASE_URL,
     pool_size=5,
     max_overflow=10,
+    pool_pre_ping=True,  # the instance can be deleted and restored from a snapshot (corp_db_down/up)
     echo=False,
 )
 
