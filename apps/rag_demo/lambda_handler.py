@@ -53,20 +53,22 @@ async def _run_migrations() -> list[str]:
 
 async def _integrity_check() -> dict:
     """Read-only counts (chunks without embedding, ...). Numbers only, no content."""
-    from aiplatform.storage.database import engine
+    from aiplatform.storage.database import create_oneshot_engine
     from aiplatform.storage.integrity import run_integrity_check
 
+    engine = create_oneshot_engine()
     try:
         return await run_integrity_check(engine)
     finally:
-        await engine.dispose()  # asyncio.run() gives every call its own event loop
+        await engine.dispose()
 
 
 async def _list_documents(app_name: str) -> list[dict]:
     """Read-only document metadata (no content) of one namespace."""
-    from aiplatform.storage.database import engine
+    from aiplatform.storage.database import create_oneshot_engine
     from aiplatform.storage.integrity import list_document_metadata
 
+    engine = create_oneshot_engine()
     try:
         return await list_document_metadata(engine, app_name)
     finally:

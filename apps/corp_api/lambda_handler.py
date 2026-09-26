@@ -2,6 +2,7 @@ import asyncio
 
 from aiplatform.smoke import handle_smoke_test
 from aiplatform.storage.corp_db import corp_engine
+from aiplatform.storage.database import create_oneshot_engine
 from apps.corp_api.main import app
 from mangum import Mangum
 
@@ -9,7 +10,7 @@ _mangum = Mangum(app, lifespan="off")
 
 
 def handler(event, context):
-    smoke = handle_smoke_test(event, "corp-api", lambda: corp_engine)
+    smoke = handle_smoke_test(event, "corp-api", lambda: create_oneshot_engine(corp_engine.url))
     if smoke is not None:
         return smoke
     # Direct Lambda invocation for one-time admin tasks (not via API Gateway)

@@ -71,3 +71,15 @@ def test_every_handler_answers_the_smoke_test_without_running_its_pipeline(
     assert result["function"] == expected_name
     if module_path == "apps.rag_demo.lambda_handler":
         sys.modules.pop(module_path, None)
+
+
+def test_direct_invoke_engine_is_unpooled_and_separate_from_the_shared_engine():
+    """A pooled connection from an earlier HTTP request lives in another event loop and breaks the
+    asyncio.run() of a direct-invoke action ("attached to a different loop")."""
+    from aiplatform.storage.database import create_oneshot_engine, engine
+
+    oneshot = create_oneshot_engine()
+
+    assert oneshot.pool.__class__.__name__ == "NullPool"
+    assert oneshot is not engine
+    assert oneshot.url == engine.url

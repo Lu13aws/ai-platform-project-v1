@@ -14,9 +14,9 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 
 
 def _public_engine() -> AsyncEngine:
-    from aiplatform.storage.database import engine
+    from aiplatform.storage.database import create_oneshot_engine
 
-    return engine
+    return create_oneshot_engine()
 
 
 async def _ping(engine: AsyncEngine) -> None:
