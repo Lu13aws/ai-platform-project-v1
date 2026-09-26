@@ -351,7 +351,7 @@ Example:
 | radar reports                   |         12–24 months | useful for portfolio and analysis               |
 | embeddings for public documents | until source changes | avoid unnecessary re-embedding                  |
 | temporary processing files      |             1–7 days | delete automatically                            |
-| logs                            |           14–30 days | avoid log cost growth (target; not yet configured, log groups do not expire) |
+| logs                            |           14–30 days | avoid log cost growth (30 days configured on all log groups) |
 | private documents               |        manual review | never delete automatically without confirmation |
 
 ---

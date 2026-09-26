@@ -380,7 +380,7 @@ Track: RDS storage, S3 storage, Lambda/ECS compute, LLM API usage, embedding API
 - **Chunking cap:** `MAX_CHUNKS_PER_DOC=1000` — prevents runaway costs on large documents
 - **LLM cap:** `MAX_LLM_CALLS_PER_RUN=100` per run
 - **Embedding cap:** `MAX_EMBEDDING_CALLS_PER_RUN=1000` per run
-- **Retention:** Raw articles and raw pages 30 days, embeddings kept until source changes, logs: 30-day target (not yet configured)
+- **Retention:** Raw articles and raw pages 30 days, embeddings kept until source changes, logs 30 days (configured on all CloudWatch log groups)
 - **Model selection:** `gpt-4o-mini` (chat) + `text-embedding-3-small` (embeddings) for cost efficiency
 
 ---

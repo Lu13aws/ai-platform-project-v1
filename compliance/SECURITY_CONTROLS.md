@@ -17,6 +17,8 @@ It serves as evidence for the controls stated in `research/phase6/compliance_map
 | End-user authentication | Amazon Cognito User Pool `ai-platform-corp-users` | `scripts/setup_corp_cognito.py` | GDPR Art. 32, AWS WAF |
 | JWT token validation | API Gateway Cognito JWT Authorizer (`cognito-jwt`) on every data route (`query`, `ingest`, `sources`, `audit`, `DELETE documents`). The catch-all `$default` route and `/corp/health` carry no authorizer; for protected handlers the application then fails closed (401) | AWS Console → API Gateway → Routes / Authorizers | GDPR Art. 32 |
 | Role-based access control | `require_admin` FastAPI dependency checks `corp-admins` Cognito group membership | `apps/corp_api/auth/cognito.py` | NIST GOVERN, GDPR Art. 32 |
+| Admin gate on public write routes | `POST /ingest`, `POST /kp/ingest-skill` and the LinkedIn management routes require the `corp-admins` group of the public pool, not just a valid token (since 2026-09-26; covered by unit tests) | `apps/rag_demo/api/routes.py`, `apps/knowledge_platform/api/routes.py` | NIST MANAGE, GDPR Art. 32 |
+| Self-registration closed | Public pool `ai-platform-public` has `AllowAdminCreateUserOnly=true` (since 2026-09-26); accounts are created by the owner. Existing accounts are unaffected | AWS Console → Cognito → Sign-up | GDPR Art. 5, NIST MANAGE |
 | Least privilege IAM | `ai-platform-corp-lambda-role` separate from public Lambda role | `scripts/deploy_corp_api.py` | AWS WAF Security Pillar |
 | No hardcoded credentials | `CORP_DATABASE_URL` and the LLM API keys come from AWS Secrets Manager (`ai-platform/corp-app-secrets`, read at cold start); the Lambda environment holds only the secret name and Cognito IDs | `aiplatform/storage/corp_db.py`, `scripts/deploy_corp_api.py` | AWS WAF Security Pillar |
 
@@ -64,6 +66,7 @@ It serves as evidence for the controls stated in `research/phase6/compliance_map
 | Automated retention enforcement | CleanupAgent Lambda runs monthly (1st of month 03:00 UTC) on the public database and its S3 reports. It does not touch the corporate database: documents and audit logs there are deleted manually | `aiplatform/agents/cleanup.py` | GDPR Art. 5, NIST MANAGE |
 | On-request deletion | `DELETE /corp/documents/{id}` cascades: document → chunks → embeddings | `corp_service.py:delete_document()` | GDPR Art. 17 |
 | SHA-256 deduplication | `content_hash` stored per document; unchanged documents never re-embedded | `aiplatform/ingestion/deduplication.py` | Cost control, GDPR Art. 5 (accuracy) |
+| Log retention | All 24 CloudWatch log groups expire after 30 days (set on 2026-09-26) | AWS Console → CloudWatch → Log groups | GDPR Art. 5 |
 | Retention policy documentation | Retention table per data type documented in `CLAUDE.md` and `ROPA.md` | `CLAUDE.md:Data Retention Strategy`, `compliance/ROPA.md` | GDPR Art. 5, NIST GOVERN |
 
 ---
@@ -101,8 +104,7 @@ It serves as evidence for the controls stated in `research/phase6/compliance_map
 | No CloudTrail trail configured (only the 90-day event history exists) | Medium | Create a trail before real client data is used |
 | No CloudWatch alarms and no API Gateway access logging | Medium | Alarms on Lambda errors and 5xx; enable access logs |
 | MFA is off on all three Cognito user pools, including the corp admin pool | Medium | Enable TOTP MFA for the `corp-admins` group |
-| CloudWatch log groups have no retention (all 24 never expire); the documented target is 30 days | Low | Set 30-day retention |
-| Public user pool allows self-registration and the login page shows no privacy notice | Low | Add a privacy notice; decide whether registration stays open |
+| Login page shows no privacy notice (registration is closed; 2 existing accounts) | Low | Add a short notice |
 | Secret rotation is disabled on all secrets | Low | Manual rotation per `INCIDENT_RESPONSE.md` |
 | CI deploys with a long-lived IAM access key (`github-actions-portfolio`, no MFA) | Low | Move to a GitHub OIDC role |
 | Right to Access API (Art. 15) incomplete | Low | `GET /corp/sources` partial; full export not implemented |

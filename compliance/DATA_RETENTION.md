@@ -22,7 +22,7 @@ For the full Art. 30 legal record, see [ROPA.md](ROPA.md).
 | LinkedIn draft posts | 12 months | CleanupAgent (automated, monthly) |
 | Platform agent heartbeats | Until next heartbeat overwrites | Automatic (self-replacing) |
 | User accounts (Cognito: e-mail address, group membership) | Until removed by the administrator | Admin |
-| CloudWatch logs (Lambda) | No expiry configured yet (target 30 days) | Not yet enforced |
+| CloudWatch logs (Lambda and other services) | 30 days (set on all log groups on 2026-09-26) | CloudWatch (automatic) |
 
 ---
 

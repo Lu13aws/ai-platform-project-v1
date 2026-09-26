@@ -47,8 +47,8 @@ in the documents instead of adjusting the platform to the text.
 | 27 | Coverage 70 % / 75 % / 85 % vs 85 % / 85 % / 85 % in other documents | Inconsistent across documents; harmonised to 70 / 75 / 85 and labelled as self-assessment | ✏️ |
 
 Added to the documents because they were missing: shared-database note, public-API abuse protection, provider spend
-limit, and seven further gaps (no alarms, no access logging, MFA off, log retention, self-registration without
-privacy notice, no secret rotation, long-lived CI key).
+limit, admin gate on write routes, closed self-registration, log retention, and further gaps (no alarms, no access
+logging, MFA off, no privacy notice, no secret rotation, long-lived CI key).
 
 ## DATA_RETENTION.md and ROPA.md
 
@@ -59,7 +59,7 @@ privacy notice, no secret rotation, long-lived CI key).
 | 30 | Radar reports 12–24 months; regulatory reports permanent | Radar and regulatory reports 24 months (database row and S3 files), competitor reports 12 months | ✏️ |
 | 31 | LinkedIn drafts kept indefinitely | Deleted after 12 months by the CleanupAgent | ✏️ |
 | 32 | Audit logs kept 12 months, deleted on request | No automated expiry; deletion is manual | ✏️ |
-| 33 | No personal data of third parties stored | Cognito holds e-mail addresses (public pool: self-registration, 2 accounts; corp pool: 1); audit log holds e-mail and IP; documented as exceptions, plus a new processing activity 8 | ✏️ |
+| 33 | No personal data of third parties stored | Cognito holds e-mail addresses (public pool: 2 accounts, self-registration closed on 2026-09-26; corp pool: 1); audit log holds e-mail and IP; documented as exceptions, plus a new processing activity 8 | ✏️ |
 | 34 | RDS automated backups kept 7 days | 1 day on both instances; manual snapshots remain until deleted | ✏️ |
 | 35 | Storage encrypted at rest (S3 too) | Default encryption `AES256` on the checked buckets | ✅ |
 | 36 | (not stated) Public reports | Bucket policy allows public read on four report prefixes; now documented | ✏️ |
@@ -99,6 +99,14 @@ privacy notice, no secret rotation, long-lived CI key).
 | 60 | Audit logs never sent to AI providers | Not exhaustively traced through the code | ❔ |
 | 61 | Acceptable-use rules (permitted / prohibited uses, liability) | Policy text | ➖ |
 
+## Finding during this check: write routes of the public API
+
+| # | Claim / intent | Actual state | Verdict |
+|---|---|---|---|
+| 68 | Ingestion routes are management routes gated by the admin group (comment in `scripts/setup_platform_cognito.py`) | `POST /ingest` and `POST /kp/ingest-skill` only required a valid token, and the public pool allowed self-registration (open 2026-06-22 to 2026-09-26). Fixed and deployed on 2026-09-26: both routes require `corp-admins` | ✏️ |
+| 69 | Was the gap used? | Checked: pool has 2 accounts (both created 2026-06-22, no registration since); CloudTrail (last 90 days) shows no `SignUp` and 62 sign-ins, all from the owner's address; all 74 toolkit-skill documents match a version in the toolkit git history byte for byte, 9 of 10 project/compliance documents match this repository's history, 44 report documents were indexed within minutes of their S3 object; no document with an unknown source. Not provable: Lambda logs contain no request lines and CloudTrail covers only 90 days | ✅ / ❔ |
+| 70 | CloudWatch logs expire after 14–30 days | Was: none of 24 log groups expired. Now: 30 days on all | ✏️ |
+
 ## research/phase6/compliance_mapping_v2.md
 
 | # | Claim | Actual state | Verdict |
@@ -115,4 +123,4 @@ privacy notice, no secret rotation, long-lived CI key).
 ## Still open (not documentation problems)
 
 Listed in `SECURITY_CONTROLS.md`, section 8: no CloudTrail trail, no alarms, no access logging, MFA off on the
-Cognito pools, log retention, self-registration without privacy notice, no secret rotation, long-lived CI key.
+Cognito pools, no privacy notice on the login page, no secret rotation, long-lived CI key.

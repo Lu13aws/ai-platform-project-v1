@@ -142,11 +142,11 @@
 | **Purpose** | Sign-in to platform.bridging-data.com for the protected areas (LinkedIn review, ingestion, corporate demo) |
 | **Legal basis** | Voluntary registration / legitimate interest in access control (to be confirmed by the controller) |
 | **Data categories** | E-mail address, Cognito user ID, group membership; sign-in metadata handled by Cognito |
-| **Data subjects** | Visitors who register (pool `ai-platform-public`, self-registration enabled, 2 accounts on 2026-09-26); corporate admin (pool `ai-platform-corp-users`, 1 account) |
+| **Data subjects** | Visitors who register (pool `ai-platform-public`, 2 accounts; self-registration was open from 2026-06-22 and closed on 2026-09-26); corporate admin (pool `ai-platform-corp-users`, 1 account) |
 | **Recipients** | AWS (Cognito) only; not sent to OpenAI or Anthropic |
 | **Retention** | Until the account is deleted by the administrator; no automatic expiry |
 | **Storage** | Amazon Cognito (eu-central-1) |
-| **Known gaps** | No privacy notice on the login page; MFA is not enabled |
+| **Known gaps** | No privacy notice on the login page (existing accounts only); MFA is not enabled |
 
 ---
 
