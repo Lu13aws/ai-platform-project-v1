@@ -75,6 +75,18 @@ async def _list_documents(app_name: str) -> list[dict]:
         await engine.dispose()
 
 
+async def _delete_namespace(app_name, expected_documents, confirm, dry_run: bool) -> dict:
+    """Guarded, transactional namespace deletion (dry run unless dry_run is explicitly False)."""
+    from aiplatform.storage.database import create_oneshot_engine
+    from aiplatform.storage.namespace_delete import delete_namespace
+
+    engine = create_oneshot_engine()
+    try:
+        return await delete_namespace(engine, app_name, expected_documents, confirm, dry_run)
+    finally:
+        await engine.dispose()
+
+
 def handler(event, context):
     smoke = handle_smoke_test(event, "rag-demo")
     if smoke is not None:
@@ -92,4 +104,19 @@ def handler(event, context):
             return {"status": "error", "error": "list_documents needs a non-empty app_name"}
         documents = run_preserving_loop(_list_documents(app_name))
         return {"status": "ok", "app_name": app_name, "count": len(documents), "documents": documents}
+    if event.get("action") == "delete_namespace":
+        from aiplatform.storage.namespace_delete import NamespaceDeleteRefused
+
+        try:
+            result = run_preserving_loop(
+                _delete_namespace(
+                    event.get("app_name"),
+                    event.get("expected_documents"),
+                    event.get("confirm"),
+                    event.get("dry_run") is not False,  # anything but an explicit false stays a dry run
+                )
+            )
+        except NamespaceDeleteRefused as exc:
+            return {"status": "refused", "error": str(exc)}
+        return {"status": "ok", **result}
     return _mangum(event, context)
