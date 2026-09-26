@@ -16,9 +16,11 @@ import json
 import sys
 import time
 from pathlib import Path
+from urllib.parse import urlparse
 
 import boto3
 from _aws import account_id
+from _secrets import ensure_secret_merged, grant_secret_read
 
 ACCOUNT_ID = account_id()
 REGION = "eu-central-1"
@@ -29,6 +31,8 @@ HANDLER_CMD = ["apps.cleanup.lambda_handler.handler"]
 
 ROLE_NAME = "ai-platform-lambda-role"
 S3_POLICY_NAME = "ai-platform-s3-radar-write"
+APP_SECRET_NAME = "ai-platform/app-secrets"  # same secret the other Lambdas use
+APP_SECRET_POLICY_NAME = "AppSecretsAccess"
 
 EVENTBRIDGE_RULE_NAME = "ai-platform-cleanup-monthly"
 EVENTBRIDGE_SCHEDULE = "cron(0 3 1 * ? *)"   # 1st of every month at 03:00 UTC
@@ -80,13 +84,23 @@ def ensure_role(iam) -> str:
     return role_arn
 
 
+def sync_app_secret(sm, iam) -> None:
+    """DATABASE_URL lives in Secrets Manager (shared secret), not in the Lambda environment."""
+    from aiplatform.settings import settings
+
+    if urlparse(settings.database_url).hostname in (None, "", "localhost", "127.0.0.1"):
+        sys.exit("ERROR: DATABASE_URL points at a local database; refusing to write it to the shared secret.")
+    secret_arn = ensure_secret_merged(sm, APP_SECRET_NAME, {"DATABASE_URL": settings.database_url})
+    grant_secret_read(iam, ROLE_NAME, APP_SECRET_POLICY_NAME, secret_arn)
+
+
 def build_env_vars() -> dict[str, str]:
     from aiplatform.settings import settings
     return {
         "APP_ENV": "production",
         "REQUIRE_LLM": "false",   # cleanup does not call the LLM
-        "DATABASE_URL": settings.database_url,
         "S3_BUCKET_NAME": settings.s3_bucket_name,
+        # DATABASE_URL comes from Secrets Manager at cold start (aiplatform/secrets.py)
         # AWS credentials injected automatically via Lambda IAM role
     }
 
@@ -169,6 +183,9 @@ def main() -> None:
     except Exception as exc:
         print(f"  [error] {type(exc).__name__}: {exc}", file=sys.stderr)
         sys.exit(1)
+
+    print("\n=== Step 1b: App secret (Secrets Manager) ===")
+    sync_app_secret(boto3.client("secretsmanager", region_name=REGION), iam)
 
     print("\n=== Step 2: Lambda function ===")
     env_vars = build_env_vars()

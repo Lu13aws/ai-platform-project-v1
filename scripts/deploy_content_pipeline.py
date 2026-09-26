@@ -20,7 +20,8 @@ What this reuses:
 
 Prerequisites:
   - Run scripts/setup_linkedin_oauth.py first to store credentials in Secrets Manager
-  - Set LINKEDIN_CLIENT_ID and LINKEDIN_CLIENT_SECRET in your .env
+    (that script needs LINKEDIN_CLIENT_ID / LINKEDIN_CLIENT_SECRET in your .env; this
+    deploy does not copy them into the Lambda environment)
 """
 
 import json
@@ -150,11 +151,8 @@ def build_env_vars() -> dict[str, str]:
         "SNS_TOPIC_ARN": load_sns_config(),
         "LINKEDIN_SECRET_NAME": SECRET_NAME,
     }
-    # Optional: client credentials as env vars (fallback if not in Secret)
-    if hasattr(settings, "linkedin_client_id") and settings.linkedin_client_id:
-        env["LINKEDIN_CLIENT_ID"] = settings.linkedin_client_id
-    if hasattr(settings, "linkedin_client_secret") and settings.linkedin_client_secret:
-        env["LINKEDIN_CLIENT_SECRET"] = settings.linkedin_client_secret.get_secret_value()
+    # LinkedIn client id/secret are NOT passed as env vars: the publisher reads them
+    # at runtime from the Secrets Manager secret named by LINKEDIN_SECRET_NAME.
     return env
 
 
