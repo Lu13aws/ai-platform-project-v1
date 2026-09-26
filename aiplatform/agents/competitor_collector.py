@@ -21,7 +21,6 @@ import re
 import time
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
-from io import BytesIO
 from typing import Any
 
 import httpx
@@ -36,7 +35,6 @@ from aiplatform.storage.competitor_models import (
     CompetitorSignal,
     CompetitorSource,
 )
-from aiplatform.storage.s3 import S3Client
 
 _REQUEST_TIMEOUT = 30.0
 _MAX_ARTICLE_CONTENT = 3_000
@@ -142,7 +140,6 @@ class CompetitorCollectorAgent:
                     print(f"  [err]   {msg}")
 
         # Phase 2: save to DB (short session)
-        s3 = S3Client()
         now = datetime.now(UTC)
 
         # Save blog/HN articles as CompetitorRawContent (deduplicate by URL)

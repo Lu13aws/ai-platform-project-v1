@@ -116,7 +116,7 @@ class LinkedInPublisherAgent:
         # Refresh token if close to expiry (only possible when refresh_token exists)
         if _is_token_expired(creds):
             if not has_refresh:
-                print(f"  [linkedin] Token expired and no refresh token — cannot publish")
+                print("  [linkedin] Token expired and no refresh token — cannot publish")
                 return False
             print("  [linkedin] Access token expiring — refreshing...")
             try:

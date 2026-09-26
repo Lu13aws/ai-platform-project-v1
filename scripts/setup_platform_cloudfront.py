@@ -6,6 +6,7 @@ Run once:
 """
 
 import json
+
 import boto3
 
 REGION = "eu-central-1"
@@ -132,11 +133,11 @@ def main() -> None:
     )
     print(f"Route 53 A record: {DOMAIN} -> {cf_domain}")
 
-    print(f"\n--- Done ---")
+    print("\n--- Done ---")
     print(f"CloudFront Distribution ID: {dist_id}")
     print(f"CloudFront Domain: {cf_domain}")
     print(f"Platform URL: https://{DOMAIN} (live in ~15 min after DNS propagates)")
-    print(f"\nAdd to GitHub Actions secrets:")
+    print("\nAdd to GitHub Actions secrets:")
     print(f"PLATFORM_CF_DISTRIBUTION_ID={dist_id}")
 
 

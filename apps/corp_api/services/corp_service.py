@@ -7,9 +7,6 @@ Uses the corp DB session (ai-platform-db-corp) — never touches the public DB.
 import hashlib
 from uuid import UUID
 
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from aiplatform.ingestion.chunker import Chunker
 from aiplatform.llm import get_llm_provider
 from aiplatform.llm.base import Message
@@ -30,6 +27,8 @@ from apps.corp_api.api.schemas import (
     SourcesResponse,
 )
 from apps.corp_api.auth.cognito import UserClaims
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 _CORP_SYSTEM_PROMPT = """\
 You are a knowledgeable assistant for the AI Knowledge Platform corporate demo.

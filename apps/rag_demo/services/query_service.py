@@ -2,12 +2,11 @@
 Query service: embed question → retrieve chunks → build prompt → LLM → answer.
 """
 
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from aiplatform.llm import Message, get_llm_provider
 from aiplatform.retrieval.embedder import Embedder
 from aiplatform.retrieval.vector_store import VectorStore
 from apps.rag_demo.api.schemas import QueryRequest, QueryResponse, SourceReference
+from sqlalchemy.ext.asyncio import AsyncSession
 
 _RAG_SYSTEM_PROMPT = """\
 You are a knowledgeable assistant that answers questions using only the provided context.

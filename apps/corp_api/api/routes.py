@@ -1,8 +1,5 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Request
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from aiplatform.storage.corp_db import get_corp_session_dep
 from apps.corp_api.api.schemas import (
     AuditResponse,
@@ -22,6 +19,8 @@ from apps.corp_api.services.corp_service import (
     ingest_corp,
     query_corp,
 )
+from fastapi import APIRouter, Depends, HTTPException, Request
+from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter(prefix="/corp", tags=["corporate"])
 

@@ -3,8 +3,6 @@
 
 import asyncio
 
-from sqlalchemy import func, select
-
 from aiplatform.storage.database import get_async_session
 from aiplatform.storage.radar_models import (
     RadarEntry,
@@ -13,6 +11,7 @@ from aiplatform.storage.radar_models import (
     RadarSource,
     RawArticle,
 )
+from sqlalchemy import func, select
 
 
 async def main() -> None:

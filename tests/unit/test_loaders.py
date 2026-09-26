@@ -3,7 +3,6 @@ import tempfile
 from pathlib import Path
 
 import pytest
-
 from aiplatform.ingestion.loaders import (
     CSVLoader,
     HTMLLoader,
@@ -17,9 +16,8 @@ from aiplatform.settings import settings
 
 
 def write_temp(suffix: str, content: str) -> Path:
-    f = tempfile.NamedTemporaryFile(suffix=suffix, mode="w", encoding="utf-8", delete=False)
-    f.write(content)
-    f.close()
+    with tempfile.NamedTemporaryFile(suffix=suffix, mode="w", encoding="utf-8", delete=False) as f:
+        f.write(content)
     return Path(f.name)
 
 

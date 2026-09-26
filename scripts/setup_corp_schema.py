@@ -26,12 +26,11 @@ async def main() -> None:
         print("ERROR: CORP_DATABASE_URL not set")
         sys.exit(1)
 
-    from sqlalchemy import text
-    from sqlalchemy.ext.asyncio import create_async_engine
-
     # Import models to register them with Base.metadata
     import aiplatform.storage.corp_models  # noqa: F401
     from aiplatform.storage.models import Base
+    from sqlalchemy import text
+    from sqlalchemy.ext.asyncio import create_async_engine
 
     engine = create_async_engine(corp_url, echo=True)
 

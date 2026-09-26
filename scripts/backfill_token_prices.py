@@ -30,19 +30,16 @@ from pathlib import Path
 # Allow running from repo root without install
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from sqlalchemy import select
-from sqlalchemy.dialects.postgresql import insert as pg_insert
-
 from aiplatform.agents.token_price_reporter import (
+    _API_SLEEP,
+    _LATEST_JSON_KEY,
+    _REPORT_PREFIX,
     TRACKED_MODELS,
     build_report_payload,
     derive_provider,
     extract_prices,
     fetch_commits_since,
     fetch_price_data_at_commit,
-    _API_SLEEP,
-    _LATEST_JSON_KEY,
-    _REPORT_PREFIX,
 )
 from aiplatform.storage.database import engine, get_async_session
 from aiplatform.storage.s3 import S3Client
@@ -51,6 +48,8 @@ from aiplatform.storage.token_price_models import (
     TokenPriceReport,
     TokenPriceSnapshot,
 )
+from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 DRY_RUN = os.environ.get("DRY_RUN", "").strip() in ("1", "true", "yes")
 BACKFILL_MONTHS = 24

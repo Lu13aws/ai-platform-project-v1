@@ -11,10 +11,9 @@ Re-running is safe: existing sources (matched by URL) are skipped.
 import asyncio
 from datetime import UTC, datetime
 
-from sqlalchemy import select
-
 from aiplatform.storage.database import get_async_session
 from aiplatform.storage.radar_models import RadarSource
+from sqlalchemy import select
 
 SOURCES = [
     {

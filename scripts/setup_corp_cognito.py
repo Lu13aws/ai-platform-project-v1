@@ -13,8 +13,8 @@ Usage:
     uv run python scripts/setup_corp_cognito.py
 """
 
+
 import boto3
-import json
 
 REGION = "eu-central-1"
 POOL_NAME = "ai-platform-corp-users"
@@ -165,23 +165,23 @@ def print_summary(pool_id: str, client: dict) -> None:
     print()
     print("Next steps:")
     print("  1. Set admin password:")
-    print(f"     aws cognito-idp admin-set-user-password \\")
+    print("     aws cognito-idp admin-set-user-password \\")
     print(f"       --user-pool-id {pool_id} \\")
     print(f"       --username {ADMIN_EMAIL} \\")
-    print(f"       --password '<YourStrongPassword12!' \\")
-    print(f"       --permanent")
+    print("       --password '<YourStrongPassword12!' \\")
+    print("       --permanent")
     print()
     print("  2. Create a demo user:")
-    print(f"     aws cognito-idp admin-create-user \\")
+    print("     aws cognito-idp admin-create-user \\")
     print(f"       --user-pool-id {pool_id} \\")
-    print(f"       --username demo@example.com \\")
-    print(f"       --user-attributes Name=email,Value=demo@example.com \\")
-    print(f"       --temporary-password 'TempPass123!'")
+    print("       --username demo@example.com \\")
+    print("       --user-attributes Name=email,Value=demo@example.com \\")
+    print("       --temporary-password 'TempPass123!'")
     print()
-    print(f"     aws cognito-idp admin-add-user-to-group \\")
+    print("     aws cognito-idp admin-add-user-to-group \\")
     print(f"       --user-pool-id {pool_id} \\")
-    print(f"       --username demo@example.com \\")
-    print(f"       --group-name demo_user")
+    print("       --username demo@example.com \\")
+    print("       --group-name demo_user")
     print("=" * 60)
 
 

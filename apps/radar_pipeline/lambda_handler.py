@@ -20,15 +20,17 @@ import asyncio
 import json
 import traceback
 
-from sqlalchemy import text
-
 from aiplatform.agents.analyzer import AnalyzerAgent
 from aiplatform.agents.change_detector import ChangeDetectionAgent, ChangeReport
 from aiplatform.agents.collector import CollectorAgent
 from aiplatform.agents.notifier import NotifierAgent
 from aiplatform.agents.report_indexer import ReportIndexerAgent
 from aiplatform.agents.reporter import ReporterAgent
-from aiplatform.storage.database import engine, get_async_session  # get_async_session: pipeline phases
+from aiplatform.storage.database import (  # get_async_session: pipeline phases
+    engine,
+    get_async_session,
+)
+from sqlalchemy import text
 
 
 async def _snapshot_previous_categories() -> None:

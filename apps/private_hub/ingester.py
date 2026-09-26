@@ -13,11 +13,10 @@ Usage:
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from aiplatform.ingestion.loaders import SUPPORTED_EXTENSIONS
 from apps.rag_demo.api.schemas import IngestRequest
 from apps.rag_demo.services.ingest_service import IngestService
+from sqlalchemy.ext.asyncio import AsyncSession
 
 APP_NAME = "private_hub"
 

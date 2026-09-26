@@ -11,16 +11,16 @@ Adds 4 tables for the Regulatory Radar pipeline:
   regulatory_reports   — generated report metadata
 """
 
-from typing import Sequence, Union
+from collections.abc import Sequence
 
 import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
 revision: str = "e5a1b3c7d9f2"
-down_revision: Union[str, None] = "c3d8e1f2a4b5"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = "c3d8e1f2a4b5"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:

@@ -12,10 +12,8 @@ import json
 from datetime import datetime
 
 import boto3
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from aiplatform.settings import settings
-
 
 # ── Text converters (single source of truth — imported by scripts/ingest_reports.py) ──
 
@@ -117,9 +115,10 @@ class ReportIndexerAgent:
         Uses its own DB session so any ingest error doesn't corrupt the pipeline session.
         Returns a short status string: "ok (N chunks)", "skipped", or "error: ..."
         """
-        from aiplatform.storage.database import get_async_session
         from apps.knowledge_platform.api.schemas import IngestSkillRequest
         from apps.knowledge_platform.services.platform_service import ingest_skill
+
+        from aiplatform.storage.database import get_async_session
 
         if not s3_uri:
             return "skipped (no s3_uri)"

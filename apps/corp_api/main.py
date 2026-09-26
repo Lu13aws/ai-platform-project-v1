@@ -1,7 +1,6 @@
+from apps.corp_api.api.routes import router
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-
-from apps.corp_api.api.routes import router
 
 app = FastAPI(
     title="AI Knowledge Platform — Corporate",

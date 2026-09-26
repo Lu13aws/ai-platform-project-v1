@@ -116,9 +116,9 @@ def create_or_get_role(iam, use_vpc: bool) -> str:
     if use_vpc:
         try:
             iam.attach_role_policy(RoleName=ROLE_NAME, PolicyArn=_VPC_POLICY)
-            print(f"  [ok] attached AWSLambdaVPCAccessExecutionRole")
+            print("  [ok] attached AWSLambdaVPCAccessExecutionRole")
         except iam.exceptions.EntityAlreadyExistsException:
-            print(f"  [ok] AWSLambdaVPCAccessExecutionRole already attached")
+            print("  [ok] AWSLambdaVPCAccessExecutionRole already attached")
 
     return role_arn
 

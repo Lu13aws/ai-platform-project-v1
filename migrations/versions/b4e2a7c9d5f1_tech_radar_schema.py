@@ -12,16 +12,16 @@ Adds 5 tables for the Technology Radar pipeline:
   radar_reports  — generated report metadata
 """
 
-from typing import Sequence, Union
+from collections.abc import Sequence
 
 import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
 revision: str = "b4e2a7c9d5f1"
-down_revision: Union[str, None] = "5e289095e7ee"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = "5e289095e7ee"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:

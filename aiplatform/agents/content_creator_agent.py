@@ -64,7 +64,7 @@ Return ONLY the post text — no JSON wrapper, no preamble.
 
 
 def _rotation_key() -> str:
-    return f"content/rotation_state.json"
+    return "content/rotation_state.json"
 
 
 def _load_rotation_state(s3_client) -> dict:

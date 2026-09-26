@@ -21,7 +21,11 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from aiplatform.storage.competitor_models import CompetitorRawContent, CompetitorReport, CompetitorSignal
+from aiplatform.storage.competitor_models import (
+    CompetitorRawContent,
+    CompetitorReport,
+    CompetitorSignal,
+)
 from aiplatform.storage.content_models import LinkedInPost
 from aiplatform.storage.radar_models import RadarReport, RawArticle
 from aiplatform.storage.regulatory_models import RegulatoryReport

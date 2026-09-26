@@ -6,13 +6,12 @@ LLM provider is mocked to avoid real API calls.
 from unittest.mock import patch
 
 import pytest
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-
 from aiplatform.settings import settings
 from aiplatform.storage.models import Chunk, Document, Embedding
 from apps.rag_demo.api.schemas import IngestRequest
 from apps.rag_demo.services.ingest_service import APP_NAME, IngestService
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 
 @pytest.fixture(autouse=True)

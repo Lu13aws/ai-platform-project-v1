@@ -4,9 +4,6 @@ Ingestion service: load → deduplicate → chunk → embed → store.
 
 from uuid import uuid4
 
-from sqlalchemy import delete as sql_delete, select
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from aiplatform.ingestion.chunker import Chunker
 from aiplatform.ingestion.deduplication import content_changed, hash_content
 from aiplatform.ingestion.loaders import get_loader, validate_source_path
@@ -14,6 +11,10 @@ from aiplatform.llm import get_llm_provider
 from aiplatform.retrieval.embedder import Embedder
 from aiplatform.storage.models import Chunk, Document, Embedding
 from apps.rag_demo.api.schemas import IngestRequest, IngestResponse
+from sqlalchemy import delete as sql_delete
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 
 class IngestService:
     def __init__(self, session: AsyncSession, app_name: str = "rag_demo") -> None:
@@ -105,7 +106,7 @@ class IngestService:
 
         await self._session.flush()  # resolve chunk PKs before embedding FKs
 
-        for chunk_id, emb in zip(chunk_ids, embedding_responses):
+        for chunk_id, emb in zip(chunk_ids, embedding_responses, strict=True):
             self._session.add(
                 Embedding(
                     id=uuid4(),

@@ -7,12 +7,11 @@ from unittest.mock import patch
 from uuid import uuid4
 
 import pytest
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-
 from aiplatform.settings import settings
 from aiplatform.storage.models import Chunk, Document, Embedding
 from apps.rag_demo.api.schemas import QueryRequest
 from apps.rag_demo.services.query_service import APP_NAME, QueryService
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 
 @pytest.fixture
@@ -84,6 +83,7 @@ async def test_query_returns_answer_with_sources(db_session, mock_llm_provider):
 async def test_query_returns_no_results_message_when_empty(db_session, mock_llm_provider):
     # Use a vector that won't match anything in the DB
     from unittest.mock import AsyncMock
+
     from aiplatform.llm.base import EmbeddingResponse, LLMProviderName
 
     # Override embed to return a very unique vector unlikely to match

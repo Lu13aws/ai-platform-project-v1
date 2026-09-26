@@ -190,7 +190,7 @@ def create_or_update_lambda(lambda_client, role_arn: str, image_uri: str) -> str
             },
         )
         fn_arn = resp["FunctionArn"]
-        print(f"  [lambda] waiting for function to become active...")
+        print("  [lambda] waiting for function to become active...")
         waiter = lambda_client.get_waiter("function_active")
         waiter.wait(FunctionName=FUNCTION_NAME)
 
@@ -346,7 +346,7 @@ def main() -> None:
     print(f"  Authenticated: {endpoint}/api/v1/corp/health/auth")
     print()
     print("Next step — initialize corp DB schema:")
-    print(f"  CORP_DATABASE_URL=<url> uv run python scripts/setup_corp_schema.py")
+    print("  CORP_DATABASE_URL=<url> uv run python scripts/setup_corp_schema.py")
 
 
 if __name__ == "__main__":

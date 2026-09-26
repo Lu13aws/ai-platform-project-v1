@@ -36,14 +36,14 @@ def main() -> None:
     print(f"  [ok] SNS topic: {topic_arn}")
 
     # Subscribe email
-    sub = sns.subscribe(
+    sns.subscribe(
         TopicArn=topic_arn,
         Protocol="email",
         Endpoint=args.email,
         ReturnSubscriptionArn=True,
     )
     print(f"  [ok] subscribed {args.email} (status: pending confirmation)")
-    print(f"       Check your inbox and click 'Confirm subscription'")
+    print("       Check your inbox and click 'Confirm subscription'")
 
     # Save config
     SNS_CONFIG_PATH.parent.mkdir(exist_ok=True)

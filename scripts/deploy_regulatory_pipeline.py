@@ -21,7 +21,6 @@ What this reuses (already exists from Phase 2 deploy):
 
 import json
 import sys
-import time
 from pathlib import Path
 
 import boto3

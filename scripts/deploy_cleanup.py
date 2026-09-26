@@ -11,6 +11,7 @@ Usage:
 Schedule: 1st of every month at 03:00 UTC.
 """
 
+import contextlib
 import json
 import sys
 import time
@@ -71,10 +72,8 @@ def ensure_role(iam) -> str:
         time.sleep(15)
 
     for policy_arn in [_BASIC_POLICY, _VPC_POLICY]:
-        try:
+        with contextlib.suppress(Exception):  # already attached
             iam.attach_role_policy(RoleName=ROLE_NAME, PolicyArn=policy_arn)
-        except Exception:
-            pass  # already attached
 
     print("  [ok] managed policies confirmed")
     return role_arn

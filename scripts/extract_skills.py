@@ -214,7 +214,7 @@ async def process_extract(
     stats.output_tokens += out_tok
 
     # Write SKILL.md to toolkit
-    skill_path = write_skill_file(output_dir, category, skill_name, skill_md)
+    write_skill_file(output_dir, category, skill_name, skill_md)
 
     # Index via API
     try:
@@ -226,7 +226,7 @@ async def process_extract(
             category=category,
         )
         # Extract one-liner description from SKILL.md "What This Covers"
-        desc_lines = [l.strip() for l in skill_md.splitlines() if l.strip() and not l.startswith("#") and not l.startswith("---")]
+        desc_lines = [line.strip() for line in skill_md.splitlines() if line.strip() and not line.startswith("#") and not line.startswith("---")]
         description = desc_lines[0][:120] if desc_lines else skill_name
         update_skills_register(output_dir, skill_name, category, description)
         state[state_key] = current_hash
@@ -303,7 +303,7 @@ async def main(config_path: str, dry_run: bool) -> None:
     state = load_state(state_file)
     stats = RunStats()
 
-    print(f"Skill Extraction Agent")
+    print("Skill Extraction Agent")
     print(f"  config   : {config_path}")
     print(f"  api      : {ingest_url}")
     print(f"  dry-run  : {dry_run}")

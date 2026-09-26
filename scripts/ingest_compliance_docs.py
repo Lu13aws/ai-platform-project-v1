@@ -81,7 +81,7 @@ def main() -> None:
         print(f"No .md files found in {COMPLIANCE_DIR}")
         sys.exit(1)
 
-    print(f"Compliance Document Indexer")
+    print("Compliance Document Indexer")
     print(f"  source : {COMPLIANCE_DIR}")
     print(f"  target : {INGEST_ENDPOINT}")
     print(f"  files  : {len(docs)}")

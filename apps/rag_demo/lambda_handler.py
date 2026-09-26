@@ -1,16 +1,15 @@
 import asyncio
 
-from mangum import Mangum
-
 from apps.rag_demo.main import app
+from mangum import Mangum
 
 _mangum = Mangum(app, lifespan="off")
 
 
 async def _run_migrations() -> list[str]:
     """Apply DDL changes directly — alembic.ini not available in Lambda image."""
-    from sqlalchemy import text
     from aiplatform.storage.database import engine
+    from sqlalchemy import text
 
     applied = []
     async with engine.begin() as conn:

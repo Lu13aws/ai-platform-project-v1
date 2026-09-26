@@ -91,7 +91,7 @@ def main() -> None:
         f"&scope={urllib.parse.quote(SCOPES)}"
     )
 
-    print(f"Opening browser for LinkedIn authorization...")
+    print("Opening browser for LinkedIn authorization...")
     print(f"If browser doesn't open, visit:\n  {auth_url}\n")
 
     # Start local callback server in background thread
@@ -184,12 +184,12 @@ def main() -> None:
         )
         print(f"[ok] Secret updated: {SECRET_NAME}")
 
-    print(f"\n=== Setup complete ===")
+    print("\n=== Setup complete ===")
     print(f"  Person URN      : {person_urn}")
     print(f"  Token expires   : {token_expires_at}")
     print(f"  Secret name     : {SECRET_NAME}")
-    print(f"\nRun deploy next:")
-    print(f"  uv run python scripts/deploy_content_pipeline.py")
+    print("\nRun deploy next:")
+    print("  uv run python scripts/deploy_content_pipeline.py")
 
 
 if __name__ == "__main__":

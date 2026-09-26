@@ -8,15 +8,15 @@ Daily usage counters that cap LLM-backed public endpoints.
 Retention: one row per scope per day (~365/year) — no pruning needed.
 """
 
-from typing import Sequence, Union
+from collections.abc import Sequence
 
 import sqlalchemy as sa
 from alembic import op
 
 revision: str = "d4f1a9c2e7b3"
-down_revision: Union[str, None] = "c7d2e4f1a8b9"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = "c7d2e4f1a8b9"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:

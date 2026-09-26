@@ -5,9 +5,6 @@ Aggregate queries across all platform schemas for the Knowledge Platform dashboa
 from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
-from sqlalchemy import func, select
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from aiplatform.ingestion.chunker import Chunker
 from aiplatform.ingestion.deduplication import content_changed, hash_content
 from aiplatform.llm import get_llm_provider
@@ -28,6 +25,8 @@ from apps.knowledge_platform.api.schemas import (
     ReportItem,
     SkillItem,
 )
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 # Hardcoded agent registry — matches EventBridge schedules in AWS
 _AGENT_REGISTRY = [
@@ -447,7 +446,7 @@ async def ingest_skill(session: AsyncSession, request: IngestSkillRequest) -> In
 
     await session.flush()
 
-    for cid, emb in zip(chunk_ids, embedding_responses):
+    for cid, emb in zip(chunk_ids, embedding_responses, strict=True):
         session.add(Embedding(
             id=uuid4(),
             chunk_id=cid,

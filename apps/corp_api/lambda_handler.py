@@ -1,8 +1,7 @@
 import asyncio
 
-from mangum import Mangum
-
 from apps.corp_api.main import app
+from mangum import Mangum
 
 _mangum = Mangum(app, lifespan="off")
 
@@ -10,12 +9,11 @@ _mangum = Mangum(app, lifespan="off")
 def handler(event, context):
     # Direct Lambda invocation for one-time admin tasks (not via API Gateway)
     if event.get("admin_action") == "setup_schema":
-        from sqlalchemy import text
-        from sqlalchemy.ext.asyncio import create_async_engine
-
         import aiplatform.storage.corp_models  # noqa: F401 — registers AuditLog with Base
         from aiplatform.storage.corp_db import _CORP_DATABASE_URL
         from aiplatform.storage.models import Base
+        from sqlalchemy import text
+        from sqlalchemy.ext.asyncio import create_async_engine
 
         async def _setup():
             engine = create_async_engine(_CORP_DATABASE_URL)

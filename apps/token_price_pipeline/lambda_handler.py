@@ -29,13 +29,12 @@ from aiplatform.storage.database import engine, get_async_session
 
 async def _run_migrate() -> dict:
     """Create token price tables directly via SQLAlchemy (no alembic needed in Lambda)."""
-    from sqlalchemy import text
-
     from aiplatform.storage.token_price_models import (
         TokenPriceCommitProcessed,
         TokenPriceReport,
         TokenPriceSnapshot,
     )
+    from sqlalchemy import text
 
     try:
         async with engine.begin() as conn:

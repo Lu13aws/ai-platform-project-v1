@@ -12,8 +12,8 @@ Usage:
     uv run python scripts/setup_corp_rds.py
 """
 
+
 import boto3
-import time
 
 REGION = "eu-central-1"
 ACCOUNT_ID = "759302162548"
@@ -125,7 +125,7 @@ def get_or_create_rds(rds, sg_id: str) -> dict:
     print("=" * 60)
     print("IMPORTANT — save these credentials NOW:")
     print(f"  Host:     {endpoint}")
-    print(f"  Port:     5432")
+    print("  Port:     5432")
     print(f"  DB:       {DB_NAME}")
     print(f"  Username: {DB_USERNAME}")
     print(f"  Password: {db_password}")

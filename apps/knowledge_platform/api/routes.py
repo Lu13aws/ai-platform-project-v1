@@ -1,8 +1,5 @@
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from aiplatform.auth.cognito import get_current_user, require_admin
 from aiplatform.quota import consume_public_query_quota
 from aiplatform.storage.database import get_session
@@ -40,6 +37,8 @@ from apps.knowledge_platform.services.platform_service import (
     record_heartbeat,
 )
 from apps.rag_demo.services.query_service import QueryService
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter(prefix="/kp", tags=["knowledge-platform"])
 

@@ -6,7 +6,6 @@ Usage:
 """
 
 import asyncio
-import json
 from pathlib import Path
 
 import boto3

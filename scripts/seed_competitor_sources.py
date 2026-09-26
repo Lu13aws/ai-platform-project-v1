@@ -11,10 +11,9 @@ Idempotent: skips sources that already exist by URL.
 import asyncio
 from datetime import UTC, datetime
 
-from sqlalchemy import select
-
 from aiplatform.storage.competitor_models import CompetitorSource
 from aiplatform.storage.database import get_async_session
+from sqlalchemy import select
 
 SOURCES = [
     # ── OpenAI ────────────────────────────────────────────────────────────────

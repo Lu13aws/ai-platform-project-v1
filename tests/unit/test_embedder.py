@@ -1,5 +1,4 @@
 import pytest
-
 from aiplatform.ingestion.chunker import TextChunk
 from aiplatform.retrieval.embedder import CostLimitExceeded, Embedder
 

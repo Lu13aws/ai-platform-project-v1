@@ -5,11 +5,10 @@ Integration test for VectorStore — requires Docker DB (make dev-up + make migr
 from uuid import uuid4
 
 import pytest
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-
 from aiplatform.retrieval.vector_store import VectorStore
 from aiplatform.settings import settings
 from aiplatform.storage.models import Chunk, Document, Embedding
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 
 @pytest.fixture

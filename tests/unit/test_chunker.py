@@ -1,5 +1,4 @@
 import pytest
-
 from aiplatform.ingestion.chunker import Chunker
 from aiplatform.settings import settings
 

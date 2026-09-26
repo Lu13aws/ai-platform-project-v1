@@ -10,13 +10,7 @@ Start:
 """
 
 from pathlib import Path
-
 from uuid import UUID
-
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import HTMLResponse
-from pydantic import BaseModel
-from sqlalchemy import func, select
 
 from aiplatform.settings import settings
 from aiplatform.storage.database import get_async_session
@@ -24,6 +18,10 @@ from aiplatform.storage.models import Document
 from apps.private_hub.ingester import APP_NAME, FolderIngester, IngestResult
 from apps.rag_demo.api.schemas import QueryRequest, QueryResponse
 from apps.rag_demo.services.query_service import QueryService
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import HTMLResponse
+from pydantic import BaseModel
+from sqlalchemy import func, select
 
 _PRIVATE_HUB_SYSTEM_PROMPT = """\
 You are a personal knowledge assistant with access to the user's own project documents,

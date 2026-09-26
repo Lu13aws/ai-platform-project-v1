@@ -186,6 +186,17 @@ def extract_prices(price_data: dict) -> dict[str, dict]:
 
 # ── Report builder (shared with backfill script) ───────────────────────────────
 
+def _change_pct(history: list[dict], current_input: float, cutoff: datetime) -> float | None:
+    """% change of the input price (per 1M tokens) vs. the latest snapshot older than `cutoff`."""
+    older = [s for s in history if s["effective_date"] < cutoff]
+    if not older:
+        return None
+    ref_input = older[-1]["input_cost_per_token"] * 1_000_000
+    if ref_input == 0:
+        return None
+    return round((current_input - ref_input) / ref_input * 100, 1)
+
+
 def build_report_payload(snapshots_by_model: dict[str, list[dict]], generated_at: datetime) -> dict:
     """
     Build the full JSON report payload from a dict of {model_id: [snapshots sorted by date]}.
@@ -207,16 +218,6 @@ def build_report_payload(snapshots_by_model: dict[str, list[dict]], generated_at
         latest = history[-1]
         current_input = latest["input_cost_per_token"] * 1_000_000
         current_output = latest["output_cost_per_token"] * 1_000_000
-
-        # change_pct helpers — find closest snapshot before cutoff
-        def _change_pct(cutoff: datetime) -> float | None:
-            older = [s for s in history if s["effective_date"] < cutoff]
-            if not older:
-                return None
-            ref_input = older[-1]["input_cost_per_token"] * 1_000_000
-            if ref_input == 0:
-                return None
-            return round((current_input - ref_input) / ref_input * 100, 1)
 
         first_date = history[0]["effective_date"]
         if date_range_start is None or first_date < date_range_start:
@@ -240,8 +241,8 @@ def build_report_payload(snapshots_by_model: dict[str, list[dict]], generated_at
                 }
                 for s in history
             ],
-            "change_pct_90d": _change_pct(cutoff_90d),
-            "change_pct_1y": _change_pct(cutoff_1y),
+            "change_pct_90d": _change_pct(history, current_input, cutoff_90d),
+            "change_pct_1y": _change_pct(history, current_input, cutoff_1y),
         })
 
     return {

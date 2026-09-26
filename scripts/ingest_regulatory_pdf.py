@@ -34,11 +34,10 @@ import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
-from sqlalchemy import select, update
-
 from aiplatform.storage.database import get_async_session
 from aiplatform.storage.regulatory_models import RegulatoryDocument, RegulatorySource
 from aiplatform.storage.s3 import S3Client
+from sqlalchemy import select, update
 
 _VALID_DOMAINS = {"AI", "Privacy", "Cybersecurity", "Compliance"}
 
@@ -137,7 +136,7 @@ async def ingest(pdf_path: Path, source_name: str, domain: str) -> None:
         action = "updated" if latest else "first"
         print(f"\n  [4/4] RegulatoryDocument record saved ({action} version)")
 
-    print(f"""
+    print("""
   Done.
 
   Next step — trigger the analyzer to generate the impact summary:

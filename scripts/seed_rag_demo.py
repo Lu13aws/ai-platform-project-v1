@@ -105,7 +105,7 @@ def main() -> None:
                 print()
                 continue
 
-            print(f"  [ingest] sending to API ...")
+            print("  [ingest] sending to API ...")
             result = ingest_document(path, doc, args.api_url)
 
             if result["skipped"]:

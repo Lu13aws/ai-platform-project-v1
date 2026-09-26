@@ -118,7 +118,6 @@ class CompetitorAnalyzerAgent:
 
             source_id = raw.source_id
             raw_content_id = raw.id
-            company_name_hint = raw.content[:50]  # used in error messages only
 
                 # Capture values before try block to avoid lazy-load after rollback
             article_url = raw.url

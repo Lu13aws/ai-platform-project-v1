@@ -1,8 +1,7 @@
 from datetime import datetime
 
-from pydantic import BaseModel, Field
-
 from apps.rag_demo.api.schemas import QueryRequest, QueryResponse, SourceReference  # re-export
+from pydantic import BaseModel, Field
 
 
 class StatsResponse(BaseModel):

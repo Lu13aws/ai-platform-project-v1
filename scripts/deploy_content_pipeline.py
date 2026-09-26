@@ -119,7 +119,7 @@ def attach_secrets_policy(iam, role_arn: str) -> None:
             PolicyName=policy_name,
             PolicyDocument=policy_document,
         )
-        print(f"  [ok] Secrets Manager policy attached to role")
+        print("  [ok] Secrets Manager policy attached to role")
     except Exception as exc:
         print(f"  [warn] Could not attach Secrets Manager policy: {exc}")
 

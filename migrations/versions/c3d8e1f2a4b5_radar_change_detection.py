@@ -9,15 +9,15 @@ Adds:
   radar_signals.sentiment          — LLM-extracted sentiment per article (positive/neutral/negative)
 """
 
-from typing import Sequence, Union
+from collections.abc import Sequence
 
 import sqlalchemy as sa
 from alembic import op
 
 revision: str = "c3d8e1f2a4b5"
-down_revision: Union[str, None] = "b4e2a7c9d5f1"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = "b4e2a7c9d5f1"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:

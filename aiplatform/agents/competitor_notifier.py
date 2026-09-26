@@ -8,7 +8,6 @@ from infra/sns_config.json by the deploy script).
 Skips gracefully if SNS_TOPIC_ARN is not configured (e.g. local dev).
 """
 
-import json
 import os
 
 import boto3

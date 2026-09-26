@@ -9,10 +9,9 @@ Run once after the migration:
 import asyncio
 from datetime import UTC, datetime
 
-from sqlalchemy import select
-
 from aiplatform.storage.database import get_async_session
 from aiplatform.storage.regulatory_models import RegulatorySource
+from sqlalchemy import select
 
 SOURCES = [
     {

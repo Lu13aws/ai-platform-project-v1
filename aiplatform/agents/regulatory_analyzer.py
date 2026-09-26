@@ -28,7 +28,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from aiplatform.llm import get_llm_provider
 from aiplatform.llm.base import Message
 from aiplatform.settings import settings
-from aiplatform.storage.regulatory_models import RegulatoryChange, RegulatoryDocument, RegulatorySource
+from aiplatform.storage.regulatory_models import (
+    RegulatoryChange,
+    RegulatoryDocument,
+    RegulatorySource,
+)
 from aiplatform.storage.s3 import S3Client
 
 _MAX_DIFF_CHARS = 3_000   # maximum diff text sent to LLM
@@ -271,12 +275,12 @@ def _parse_and_validate(text: str) -> dict:
     text = text.strip()
     try:
         data = json.loads(text)
-    except json.JSONDecodeError:
+    except json.JSONDecodeError as exc:
         match = re.search(r"\{.*\}", text, re.DOTALL)
         if match:
             data = json.loads(match.group())
         else:
-            raise ValueError(f"Could not parse JSON: {text[:200]}")
+            raise ValueError(f"Could not parse JSON: {text[:200]}") from exc
 
     impact = str(data.get("impact_level", "Medium")).strip().title()
     if impact not in _VALID_IMPACT_LEVELS:

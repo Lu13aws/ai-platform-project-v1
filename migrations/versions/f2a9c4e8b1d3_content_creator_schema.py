@@ -8,16 +8,16 @@ Creates table for the Content Creator pipeline:
   linkedin_posts  — generated and published LinkedIn posts (12-month retention)
 """
 
-from typing import Sequence, Union
+from collections.abc import Sequence
 
 import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
 revision: str = "f2a9c4e8b1d3"
-down_revision: Union[str, None] = "145530df3842"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = "145530df3842"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:

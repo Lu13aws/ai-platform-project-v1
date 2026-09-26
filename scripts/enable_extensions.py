@@ -2,6 +2,7 @@
 """Enable required PostgreSQL extensions on RDS before running migrations."""
 
 import sys
+
 import psycopg2
 from aiplatform.settings import settings
 
