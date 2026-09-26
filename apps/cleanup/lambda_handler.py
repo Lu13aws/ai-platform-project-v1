@@ -26,10 +26,27 @@ async def _run_cleanup() -> dict:
     }
 
 
+async def _preview() -> dict:
+    """Read-only: what a real run would delete right now. Unpooled engine, nothing is written."""
+    from aiplatform.storage.database import create_oneshot_engine
+    from sqlalchemy.ext.asyncio import AsyncSession
+
+    engine = create_oneshot_engine()
+    try:
+        async with AsyncSession(engine) as session:
+            counts = await CleanupAgent().preview(session)
+            await session.rollback()
+        return counts
+    finally:
+        await engine.dispose()
+
+
 def handler(event, context):
     smoke = handle_smoke_test(event, "cleanup")
     if smoke is not None:
         return smoke
+    if event.get("action") == "preview":  # direct invoke only; the schedule sends no "action"
+        return {"status": "ok", "would_delete": asyncio.run(_preview())}
     try:
         result = asyncio.run(_run_cleanup())
         print(f"[cleanup] done: {result}")

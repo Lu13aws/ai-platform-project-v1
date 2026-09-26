@@ -18,7 +18,7 @@ Runs monthly via EventBridge. Safe to re-run at any time.
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from aiplatform.storage.competitor_models import (
@@ -34,6 +34,30 @@ from aiplatform.storage.s3 import S3Client
 _REPORT_RETENTION_MONTHS = 24
 _COMPETITOR_REPORT_RETENTION_MONTHS = 12
 _LINKEDIN_POST_RETENTION_MONTHS = 12
+
+
+def _cutoff(months: int) -> datetime:
+    return datetime.now(UTC) - timedelta(days=months * 30)
+
+
+def _conditions() -> dict:
+    """category -> (model, delete condition). Single source of truth for run() and preview()."""
+    now = datetime.now(UTC)
+    return {
+        "raw_articles": (RawArticle, RawArticle.expires_at < now),
+        "radar_reports": (RadarReport, RadarReport.generated_at < _cutoff(_REPORT_RETENTION_MONTHS)),
+        "regulatory_reports": (
+            RegulatoryReport,
+            RegulatoryReport.generated_at < _cutoff(_REPORT_RETENTION_MONTHS),
+        ),
+        "competitor_raw_content": (CompetitorRawContent, CompetitorRawContent.expires_at < now),
+        "competitor_signals": (CompetitorSignal, CompetitorSignal.expires_at < now),
+        "competitor_reports": (
+            CompetitorReport,
+            CompetitorReport.generated_at < _cutoff(_COMPETITOR_REPORT_RETENTION_MONTHS),
+        ),
+        "linkedin_posts": (LinkedInPost, LinkedInPost.created_at < _cutoff(_LINKEDIN_POST_RETENTION_MONTHS)),
+    }
 
 
 @dataclass
@@ -83,20 +107,25 @@ class CleanupAgent:
 
         return result
 
+    async def preview(self, session: AsyncSession) -> dict[str, dict[str, int]]:
+        """Read-only: how many rows run() would delete right now (same conditions), per category."""
+        await session.execute(text("SET TRANSACTION READ ONLY"))
+        counts = {}
+        for name, (model, condition) in _conditions().items():
+            would_delete = await session.scalar(select(func.count()).select_from(model).where(condition))
+            total = await session.scalar(select(func.count()).select_from(model))
+            counts[name] = {"would_delete": would_delete, "total": total}
+        return counts
+
     async def _delete_expired_articles(self, session: AsyncSession, result: CleanupResult) -> None:
-        now = datetime.now(UTC)
-        stmt = delete(RawArticle).where(RawArticle.expires_at < now)
+        stmt = delete(RawArticle).where(_conditions()["raw_articles"][1])
         db_result = await session.execute(stmt)
         result.articles_deleted = db_result.rowcount
         print(f"  [cleanup] raw_articles deleted: {result.articles_deleted}")
 
     async def _delete_old_reports(self, session: AsyncSession, result: CleanupResult) -> None:
-        cutoff = datetime.now(UTC) - timedelta(days=_REPORT_RETENTION_MONTHS * 30)
-
         old_reports = (
-            await session.scalars(
-                select(RadarReport).where(RadarReport.generated_at < cutoff)
-            )
+            await session.scalars(select(RadarReport).where(_conditions()["radar_reports"][1]))
         ).all()
 
         print(f"  [cleanup] old radar_reports found: {len(old_reports)}")
@@ -127,11 +156,9 @@ class CleanupAgent:
         are retained permanently for historical reference (per CLAUDE.md retention rules).
         regulatory_documents (version history) are never deleted automatically.
         """
-        cutoff = datetime.now(UTC) - timedelta(days=_REPORT_RETENTION_MONTHS * 30)
-
         old_reports = (
             await session.scalars(
-                select(RegulatoryReport).where(RegulatoryReport.generated_at < cutoff)
+                select(RegulatoryReport).where(_conditions()["regulatory_reports"][1])
             )
         ).all()
 
@@ -156,8 +183,7 @@ class CleanupAgent:
     async def _delete_expired_competitor_raw_content(
         self, session: AsyncSession, result: CleanupResult
     ) -> None:
-        now = datetime.now(UTC)
-        stmt = delete(CompetitorRawContent).where(CompetitorRawContent.expires_at < now)
+        stmt = delete(CompetitorRawContent).where(_conditions()["competitor_raw_content"][1])
         db_result = await session.execute(stmt)
         result.competitor_raw_content_deleted = db_result.rowcount
         print(f"  [cleanup] competitor_raw_content deleted: {result.competitor_raw_content_deleted}")
@@ -165,8 +191,7 @@ class CleanupAgent:
     async def _delete_expired_competitor_signals(
         self, session: AsyncSession, result: CleanupResult
     ) -> None:
-        now = datetime.now(UTC)
-        stmt = delete(CompetitorSignal).where(CompetitorSignal.expires_at < now)
+        stmt = delete(CompetitorSignal).where(_conditions()["competitor_signals"][1])
         db_result = await session.execute(stmt)
         result.competitor_signals_deleted = db_result.rowcount
         print(f"  [cleanup] competitor_signals deleted: {result.competitor_signals_deleted}")
@@ -174,11 +199,9 @@ class CleanupAgent:
     async def _delete_old_competitor_reports(
         self, session: AsyncSession, result: CleanupResult
     ) -> None:
-        cutoff = datetime.now(UTC) - timedelta(days=_COMPETITOR_REPORT_RETENTION_MONTHS * 30)
-
         old_reports = (
             await session.scalars(
-                select(CompetitorReport).where(CompetitorReport.generated_at < cutoff)
+                select(CompetitorReport).where(_conditions()["competitor_reports"][1])
             )
         ).all()
 
@@ -205,8 +228,7 @@ class CleanupAgent:
     async def _delete_old_linkedin_posts(
         self, session: AsyncSession, result: CleanupResult
     ) -> None:
-        cutoff = datetime.now(UTC) - timedelta(days=_LINKEDIN_POST_RETENTION_MONTHS * 30)
-        stmt = delete(LinkedInPost).where(LinkedInPost.created_at < cutoff)
+        stmt = delete(LinkedInPost).where(_conditions()["linkedin_posts"][1])
         db_result = await session.execute(stmt)
         result.linkedin_posts_deleted = db_result.rowcount
         print(f"  [cleanup] linkedin_posts deleted: {result.linkedin_posts_deleted}")
