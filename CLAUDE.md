@@ -31,10 +31,10 @@ The platform must be modular, reusable, cost-aware, and cloud-native. All applic
 | Token Price Radar Pipeline | ✅ Live — weekly Lambda (Monday 07:00 UTC) |
 | Knowledge Platform (Agent Center, AI Chat, Skills Hub) | ✅ Live — same Lambda as RAG Demo |
 | Content Creator Pipeline | ✅ Live — weekly Lambda (Tuesday 08:30 UTC) |
-| Corporate LLM API | ✅ Live — `https://<CORP_API_ID>.execute-api.eu-central-1.amazonaws.com` |
+| Corporate LLM API | ✅ Deployed — `https://<CORP_API_ID>.execute-api.eu-central-1.amazonaws.com` (data calls need the corp database restored first, see below) |
 | Cleanup Pipeline | ✅ Live — monthly Lambda (1st of month 03:00 UTC) |
 | RDS PostgreSQL + pgvector (public) | ✅ Live — private VPC (`ai-platform-vpc`), `ai-platform-db-v2` |
-| RDS PostgreSQL + pgvector (corporate) | ✅ Live — private VPC (`ai-platform-vpc`), `ai-platform-db-corp` |
+| RDS PostgreSQL + pgvector (corporate) | ⏸ Deleted between demos (saves ~18 USD/month); restored in about 6 minutes from an encrypted snapshot with `scripts/corp_db_up.py`, removed again with `scripts/corp_db_down.py`. Same identifier `ai-platform-db-corp`, private VPC (`ai-platform-vpc`). Last state: 2 documents, 28 chunks, 27 audit entries |
 | ECR Container Registry | ✅ Live — single shared image for all Lambda functions |
 
 ### Deployed Agents

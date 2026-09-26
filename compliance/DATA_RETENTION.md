@@ -47,7 +47,8 @@ Every deletion is audit-logged with a GDPR Art. 17 notation.
 
 **Backup retention:** RDS automated backups are retained for 1 day on both database instances.
 Manual snapshots are kept until they are deleted (for example the snapshot taken before the
-June 2026 VPC migration). Deleted data may therefore remain in a snapshot until that snapshot
+June 2026 VPC migration and the final snapshots of the corporate instance, which is deleted
+between demos and contains the corporate documents and audit log). Deleted data may therefore remain in a snapshot until that snapshot
 is deleted. Snapshots are encrypted and not accessible to end users.
 
 **Public reports:** the report files under `radar/`, `competitor/`, `regulatory/` and

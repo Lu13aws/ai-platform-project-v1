@@ -28,7 +28,7 @@ It serves as evidence for the controls stated in `research/phase6/compliance_map
 
 | Control | Implementation | Evidence Location | Framework |
 |---|---|---|---|
-| Physical DB separation | `ai-platform-db-corp` — separate RDS instance from `ai-platform-db-v2` | AWS Console → RDS instances | GDPR Art. 32, NIST MAP |
+| Physical DB separation | `ai-platform-db-corp` — separate RDS instance from `ai-platform-db-v2`. Between demos the instance is deleted and restored from an encrypted snapshot (`scripts/corp_db_up.py`, about 6 minutes); the snapshots are encrypted with the same AWS-managed key | AWS Console → RDS instances / Snapshots | GDPR Art. 32, NIST MAP |
 | Separate DB connection pool | `corp_db.py` creates independent SQLAlchemy engine; never shared with public stack | `aiplatform/storage/corp_db.py` | GDPR Art. 32 |
 | Network isolation | RDS in private VPC subnets, no public endpoint; accessible from Lambda SG only | AWS Console → RDS → Connectivity | AWS WAF Security Pillar |
 | Application-level scoping | `app_name` column on documents; corp queries filter on `app_name="corp"` (the audit table has no `app_name`) | `apps/corp_api/services/corp_service.py` | GDPR Art. 5 |

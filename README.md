@@ -806,7 +806,7 @@ Then manually re-ingest the EU AI Act, GDPR, and FINMA PDFs using the steps abov
 ### 20260622 — Phase 6 complete: Corporate LLM Prototype live on platform.bridging-data.com
 
 **Completed:**
-- **Corp RDS** (`ai-platform-db-corp`) — separate PostgreSQL + pgvector instance in `ai-platform-vpc`, no public endpoint. Tables: `documents`, `chunks`, `embeddings`, `audit_logs`
+- **Corp RDS** (`ai-platform-db-corp`) — separate PostgreSQL + pgvector instance in `ai-platform-vpc`, no public endpoint. Tables: `documents`, `chunks`, `embeddings`, `audit_logs`. To save about 18 USD per month the instance is deleted between demos: `uv run python scripts/corp_db_up.py --execute` restores it from the newest encrypted snapshot in about 6 minutes (endpoint and secrets stay valid, row counts are verified), `scripts/corp_db_down.py --execute` removes it again after taking a final snapshot
 - **Corp API Lambda** (`ai-platform-corp-api`) — FastAPI + Mangum, same shared ECR image, handler `apps.corp_api.lambda_handler`
 - **Corp API Gateway** (`<CORP_API_ID>`) — HTTP API with Cognito JWT Authorizer (validates against `ai-platform-corp` user pool)
 - **RBAC** — `admin` group (ingest + query + audit + delete), `demo_user` group (query only); groups parsed from API Gateway JWT claims (bracket-stripping fix for `"[admin]"` serialization)
