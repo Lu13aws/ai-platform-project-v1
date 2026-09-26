@@ -50,8 +50,23 @@ async def _run_migrations() -> list[str]:
     return applied
 
 
+async def _integrity_check() -> dict:
+    """Read-only counts (chunks without embedding, ...). Numbers only, no content."""
+    from aiplatform.storage.database import engine
+    from aiplatform.storage.integrity import run_integrity_check
+
+    try:
+        return await run_integrity_check(engine)
+    finally:
+        await engine.dispose()  # asyncio.run() gives every call its own event loop
+
+
 def handler(event, context):
+    # Direct-invoke actions: API Gateway events never carry a top-level "action" key,
+    # so these are reachable only with lambda:InvokeFunction, not over HTTP.
     if event.get("action") == "run_migrations":
         applied = asyncio.run(_run_migrations())
         return {"status": "ok", "applied": applied}
+    if event.get("action") == "integrity_check":
+        return {"status": "ok", **asyncio.run(_integrity_check())}
     return _mangum(event, context)
