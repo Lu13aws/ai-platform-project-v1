@@ -6,7 +6,9 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts"))
 
-from _corp_db import counts_from_result, counts_to_tag, newest_snapshot  # noqa: E402
+import re  # noqa: E402
+
+from _corp_db import counts_from_result, counts_to_tag, newest_snapshot, tag_to_counts  # noqa: E402
 
 
 def snap(name, day, status="available"):
@@ -43,3 +45,23 @@ def test_counts_from_result_is_stable_and_fits_a_tag():
     assert counts == {"audit_logs": 31, "documents": 5, "chunks": 40, "no_embedding": 0, "per_app": {"corp": [5, 40]}}
     assert counts_to_tag(counts) == counts_to_tag(dict(reversed(list(counts.items()))))  # order independent
     assert len(counts_to_tag(counts)) <= 256
+
+
+def test_tag_uses_only_characters_rds_accepts_and_round_trips():
+    """Regression: the first version used JSON, which RDS rejected (braces, quotes and commas are not allowed)."""
+    counts = {"audit_logs": 27, "documents": 2, "chunks": 28, "no_embedding": 0, "per_app": {"corp": [2, 28]}}
+
+    tag = counts_to_tag(counts)
+
+    assert re.fullmatch(r"[\w\s.:/=+\-@]+", tag), tag
+    assert tag_to_counts(tag) == counts
+
+
+def test_long_breakdown_is_dropped_but_totals_survive():
+    counts = {"audit_logs": 1, "documents": 2, "chunks": 3, "no_embedding": 0,
+              "per_app": {f"namespace_{n}": [1, 1] for n in range(40)}}
+
+    tag = counts_to_tag(counts)
+
+    assert len(tag) <= 256
+    assert tag_to_counts(tag)["chunks"] == 3

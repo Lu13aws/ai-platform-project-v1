@@ -30,11 +30,28 @@ def newest_snapshot(snapshots: list[dict], prefix: str = SNAPSHOT_PREFIX) -> dic
 
 
 def counts_to_tag(counts: dict) -> str:
-    """Compact, deterministic row counts for a snapshot tag (limit 256 characters)."""
-    text = json.dumps(counts, separators=(",", ":"), sort_keys=True)
-    if len(text) > 256:  # drop the per-namespace breakdown; the totals still prove the restore
-        text = json.dumps({k: v for k, v in counts.items() if k != "per_app"}, separators=(",", ":"), sort_keys=True)
-    return text
+    """Row counts as a tag value: `audit_logs=27 chunks=28 ... app.corp=2/28`.
+
+    RDS tag values may only contain letters, digits, whitespace and _ . : / = + - @ (no JSON, no commas),
+    and are limited to 256 characters (the per-namespace part is dropped if it does not fit).
+    """
+    totals = " ".join(f"{k}={counts[k]}" for k in sorted(counts) if k != "per_app")
+    per_app = " ".join(f"app.{name}={d}/{c}" for name, (d, c) in sorted(counts.get("per_app", {}).items()))
+    text = f"{totals} {per_app}".strip()
+    return text if len(text) <= 256 else totals
+
+
+def tag_to_counts(tag: str) -> dict:
+    """Inverse of counts_to_tag."""
+    counts: dict = {}
+    for part in tag.split():
+        key, _, value = part.partition("=")
+        if key.startswith("app."):
+            documents, chunks = value.split("/")
+            counts.setdefault("per_app", {})[key[4:]] = [int(documents), int(chunks)]
+        else:
+            counts[key] = None if value == "None" else int(value)
+    return counts
 
 
 def counts_from_result(result: dict) -> dict:

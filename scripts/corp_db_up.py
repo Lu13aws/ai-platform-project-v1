@@ -35,6 +35,7 @@ from _corp_db import (
     counts_from_result,
     invoke,
     newest_snapshot,
+    tag_to_counts,
 )
 
 
@@ -62,7 +63,7 @@ def main() -> None:
     if not snap:
         sys.exit("No usable snapshot found.")
     tags = {t["Key"]: t["Value"] for t in rds.list_tags_for_resource(ResourceName=snap["DBSnapshotArn"])["TagList"]}
-    expected = json.loads(tags[COUNTS_TAG]) if COUNTS_TAG in tags else None
+    expected = tag_to_counts(tags[COUNTS_TAG]) if COUNTS_TAG in tags else None
     sg_id = ec2.describe_security_groups(Filters=[{"Name": "group-name", "Values": [SECURITY_GROUP_NAME]}])["SecurityGroups"][0]["GroupId"]
 
     print(f"snapshot : {snap['DBSnapshotIdentifier']} ({snap['SnapshotCreateTime']:%Y-%m-%d %H:%M}, encrypted={snap['Encrypted']})")
