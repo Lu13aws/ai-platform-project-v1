@@ -771,7 +771,7 @@ The platform should evolve from a simple RAG demo into a reusable AI knowledge a
 6. ✅ The answer includes source references.
 7. ✅ The system avoids unnecessary reprocessing (SHA-256 dedup + content-hash dedup).
 8. ✅ Raw and temporary data have retention rules (CleanupAgent, monthly Lambda).
-9. ✅ Monthly operating cost is known and monitored: ~USD 75/month as of Sept 2026 (fixed costs dominate: NAT gateway ~30, two RDS instances ~29, VPC public IPv4 ~6, ECR/Secrets Manager/Route 53 ~5; LLM usage is billed separately by OpenAI). The earlier ~USD 5–10 estimate assumed the free tier. AWS Budget: 50 USD/month with alerts at 85 % and 100 %.
+9. ✅ Monthly operating cost is known and monitored: ~USD 96/month for a full month (August 2026: USD 95.82 incl. 7.18 tax; fixed costs dominate: NAT gateway ~39, two RDS instances ~37, VPC public IPv4 ~7, ECR/Secrets Manager/Route 53 ~6; LLM usage is billed separately by OpenAI, hard limit 10 USD/month). The earlier ~USD 5–10 estimate assumed the free tier. AWS Budget: 50 USD/month with alerts at 85 % and 100 %.
 
 ### ✅ Phase 6 Success Criteria — ALL MET
 
