@@ -62,6 +62,15 @@ async def _integrity_check() -> dict:
         await engine.dispose()  # asyncio.run() gives every call its own event loop
 
 
+def _run(coro):
+    """asyncio.run() closes the loop; Mangum needs a current one again when the same warm
+    container serves the next HTTP request, otherwise every request returns 500."""
+    try:
+        return asyncio.run(coro)
+    finally:
+        asyncio.set_event_loop(asyncio.new_event_loop())
+
+
 def handler(event, context):
     smoke = handle_smoke_test(event, "rag-demo")
     if smoke is not None:
@@ -69,8 +78,8 @@ def handler(event, context):
     # Direct-invoke actions: API Gateway events never carry a top-level "action" key,
     # so these are reachable only with lambda:InvokeFunction, not over HTTP.
     if event.get("action") == "run_migrations":
-        applied = asyncio.run(_run_migrations())
+        applied = _run(_run_migrations())
         return {"status": "ok", "applied": applied}
     if event.get("action") == "integrity_check":
-        return {"status": "ok", **asyncio.run(_integrity_check())}
+        return {"status": "ok", **_run(_integrity_check())}
     return _mangum(event, context)

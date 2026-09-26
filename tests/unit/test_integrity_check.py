@@ -1,5 +1,6 @@
 """integrity_check: SQL logic (on a portable subset in SQLite) and direct-invoke dispatch."""
 
+import asyncio
 import importlib
 import sqlite3
 import sys
@@ -82,3 +83,56 @@ def test_http_events_never_reach_the_integrity_check(lambda_handler, monkeypatch
 
     assert lambda_handler.handler(http_event, None) == {"statusCode": 200}
     check.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "action, coroutine_name, result",
+    [
+        ("integrity_check", "_integrity_check", {"totals": {}, "per_app": []}),
+        ("run_migrations", "_run_migrations", ["applied"]),
+    ],
+)
+def test_direct_invoke_actions_leave_a_usable_event_loop(
+    lambda_handler, monkeypatch, action, coroutine_name, result
+):
+    """asyncio.run() closes the loop; Mangum needs a current one again on the next HTTP request
+    served by the same warm container (regression: every request returned 500)."""
+    monkeypatch.setattr(lambda_handler, coroutine_name, AsyncMock(return_value=result))
+
+    lambda_handler.handler({"action": action}, None)
+
+    asyncio.get_event_loop_policy().get_event_loop()  # raised RuntimeError before the fix
+
+
+def test_http_request_is_still_served_after_a_direct_invoke_action(lambda_handler, monkeypatch):
+    """The production sequence that returned 500: a direct-invoke action, then an HTTP request
+    handled by the same warm container through the real Mangum adapter."""
+    from mangum import Mangum
+
+    app = FastAPI()
+
+    @app.get("/health")
+    async def health() -> dict:
+        return {"status": "ok"}
+
+    monkeypatch.setattr(lambda_handler, "_mangum", Mangum(app, lifespan="off"))
+    monkeypatch.setattr(
+        lambda_handler, "_integrity_check", AsyncMock(return_value={"totals": {}, "per_app": []})
+    )
+    http_event = {
+        "version": "2.0",
+        "routeKey": "GET /health",
+        "rawPath": "/health",
+        "rawQueryString": "",
+        "headers": {"host": "example.test"},
+        "requestContext": {
+            "http": {"method": "GET", "path": "/health", "protocol": "HTTP/1.1", "sourceIp": "127.0.0.1"},
+            "stage": "$default",
+        },
+        "isBase64Encoded": False,
+    }
+
+    lambda_handler.handler({"action": "integrity_check"}, None)
+    response = lambda_handler.handler(http_event, None)
+
+    assert response["statusCode"] == 200
