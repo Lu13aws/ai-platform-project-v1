@@ -11,7 +11,7 @@ It is intended for customers, demo participants, and anyone evaluating AI-genera
 
 - Searches indexed documents and surfaces relevant excerpts
 - Generates answers grounded in retrieved source material
-- Cites the specific source behind every answer
+- Returns source references with every grounded answer (if nothing relevant is found it says so, without sources)
 - Classifies signals into categories (technology trends, risk levels, sentiment)
 - Drafts content based on provided context
 

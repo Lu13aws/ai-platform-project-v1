@@ -351,7 +351,7 @@ Example:
 | radar reports                   |         12–24 months | useful for portfolio and analysis               |
 | embeddings for public documents | until source changes | avoid unnecessary re-embedding                  |
 | temporary processing files      |             1–7 days | delete automatically                            |
-| logs                            |           14–30 days | avoid log cost growth                           |
+| logs                            |           14–30 days | avoid log cost growth (target; not yet configured, log groups do not expire) |
 | private documents               |        manual review | never delete automatically without confirmation |
 
 ---
@@ -708,8 +708,8 @@ Compliance-first approach: compliance mapping completed before implementation
 (see `research/phase6/compliance_mapping.md` and `compliance_mapping_v2.md`).
 
 Compliance frameworks assessed:
-* **NIST AI RMF** — ~85% coverage (Govern, Map, Measure, Manage + compliance docs)
-* **GDPR / Swiss DSG** — ~85% coverage (Art. 5, Art. 17, Art. 28, Art. 30, Art. 32 implemented)
+* **NIST AI RMF** — ~70% coverage, 14 of 20 controls fully met (Govern, Map, Measure, Manage + compliance docs)
+* **GDPR / Swiss DSG** — ~75% coverage, 12 of 16 controls fully met (Art. 5, Art. 17, Art. 28, Art. 30, Art. 32 addressed; self-assessment, not an audit)
 * **AWS Well-Architected Framework** — ~85% coverage (Security Pillar)
 
 Compliance documentation layer — all in `/compliance`:

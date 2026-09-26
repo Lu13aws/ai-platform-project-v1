@@ -3,7 +3,8 @@
 **Use case:** Corporate LLM Prototype — demo for potential customers  
 **Data:** Own business documents (Skills, README, project docs, CLAUDE.md)  
 **Assessment date:** June 2026  
-**Assessed by:** Post-implementation review against original compliance_mapping.md
+**Assessed by:** Post-implementation review against original compliance_mapping.md  
+**Re-verified against the AWS account:** 2026-09-26 (see `compliance/CLAIMS_VERIFICATION.md`). Status tables below show the June 2026 assessment; the coverage figures were corrected to match `compliance/SECURITY_CONTROLS.md`
 
 ---
 
@@ -16,8 +17,8 @@ which are acceptable for a portfolio demo context.
 
 | Framework | Coverage at Phase 6 start | Coverage after code | Coverage after /compliance docs | Delta total |
 |---|---|---|---|---|
-| NIST AI RMF | ~30% | ~70% | ~85% | +55% |
-| GDPR / Swiss DSG | ~40% | ~75% | ~85% | +45% |
+| NIST AI RMF | ~30% | ~70% | ~70% (14 of 20 fully met) | +40% |
+| GDPR / Swiss DSG | ~40% | ~75% | ~75% (12 of 16 fully met) | +35% |
 | AWS Well-Architected (Security) | ~60% | ~85% | ~85% | +25% |
 
 ---
@@ -131,9 +132,9 @@ which are acceptable for a portfolio demo context.
 | Control | Status | Evidence |
 |---|---|---|
 | IAM roles with least privilege | ✅ Done | `ai-platform-corp-lambda-role` scoped separately from public Lambda role |
-| No hardcoded credentials | ✅ Done | `CORP_DATABASE_URL` from Secrets Manager; API keys from Lambda env vars |
+| No hardcoded credentials | ✅ Done | `CORP_DATABASE_URL` and the LLM API keys from Secrets Manager (read at cold start); Lambda env holds only the secret name |
 | End-user authentication | ✅ Done | Cognito JWT authorizer on all corp API routes |
-| RBAC — users see only their data | ✅ Done | `corp-admins` Cognito group; `require_admin` dependency enforced at every endpoint |
+| RBAC — admin-group gate (no per-user row-level access) | ✅ Done | `corp-admins` Cognito group; `require_admin` dependency enforced at every endpoint |
 
 ### Infrastructure Protection
 
@@ -142,7 +143,7 @@ which are acceptable for a portfolio demo context.
 | RDS in private VPC | ✅ Done | `ai-platform-db-corp` in `<VPC_ID>`, no public endpoint |
 | Security groups scoped | ✅ Done | Port 5432 accessible from Lambda SG only |
 | Physical data isolation (private vs public) | ✅ Done | Separate RDS instance `ai-platform-db-corp`; `corp_db.py` engine never shared |
-| WAF on API Gateway | ❌ Missing | No rate limiting or WAF rules configured |
+| WAF on API Gateway | ❌ Missing | No WAF (not available for HTTP APIs). Route throttling is configured (corp API 5 req/s, burst 10) |
 
 ### Data Protection
 
@@ -160,7 +161,7 @@ which are acceptable for a portfolio demo context.
 | CloudWatch logs | ✅ Done | All Lambda logs captured, including corp-api |
 | Cost alerts | ✅ Done | AWS Budgets configured |
 | Application-level audit trail | ✅ Done | `AuditLog` table per user action |
-| Infrastructure security alerts | ❌ Missing | No GuardDuty, no CloudTrail anomaly detection |
+| Infrastructure security alerts | ❌ Missing | No GuardDuty, no CloudTrail trail, no CloudWatch alarms |
 
 ---
 
@@ -171,7 +172,7 @@ The implemented architecture matches the Phase 6 target design from the original
 ```
 Public Stack (unchanged):
   RDS ai-platform-db-v2 (ai-platform-vpc, private subnets)
-  └── app_name: rag_demo, skills_hub, knowledge_platform
+  └── app_name: rag_demo, skills_hub, knowledge_platform (the instance also holds consulting, projects and skills; the public chat allow-list does not expose them)
   Lambda: ai-platform-rag-demo (Cognito auth for platform users)
   Cognito: ai-platform-public (platform.bridging-data.com users)
 
@@ -185,8 +186,8 @@ Phase 6 Stack (isolated):
 
 **Key architectural decisions verified:**
 - Corp DB engine (`corp_db.py`) is completely independent — no shared connection pool or session factory with the public DB
-- `CORP_DATABASE_URL` is loaded from Secrets Manager at deploy time, not from shared config
-- API Gateway enforces JWT validation before the Lambda is invoked — even a broken Lambda cannot be accessed without a valid corp token
+- `CORP_DATABASE_URL` is read at cold start from its own secret (`ai-platform/corp-app-secrets`), not from shared config
+- API Gateway enforces JWT validation before the Lambda is invoked on every data route. The catch-all route has no authorizer, so the application itself fails closed (401) for protected handlers
 - Audit log is in the corp DB itself — if the corp DB is isolated, the audit trail is isolated too
 
 ---

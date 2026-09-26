@@ -19,7 +19,7 @@ The platform uses AI models from two providers depending on the component.
 | Model | `text-embedding-3-small` |
 | Dimensions | 1536 |
 | Use | Document chunking → vector embeddings for semantic search |
-| Input | Text chunks (≤ 512 tokens per chunk) |
+| Input | Text chunks (default 800 tokens per chunk, 100 tokens overlap) |
 | Output | Float vector stored in PostgreSQL/pgvector |
 
 ### LLM — Pipeline Analysis (Radar, Competitor, Regulatory)
@@ -30,7 +30,7 @@ The platform uses AI models from two providers depending on the component.
 | Model | `gpt-4o-mini` (default) |
 | Use | Signal classification (Adopt/Trial/Assess/Hold), sentiment, impact analysis |
 | Input | Extracted article text + classification prompt |
-| Max input | ~4 000 tokens per classification call |
+| Max input | ~4 000 tokens per classification call (design limit, not measured) |
 
 ### LLM — RAG Query (Public Demo + Corporate Prototype)
 
@@ -40,7 +40,7 @@ The platform uses AI models from two providers depending on the component.
 | Model | `gpt-4o-mini` (default) |
 | Use | Grounded question answering over retrieved chunks |
 | Input | Top-K retrieved chunks + user question |
-| Max input | ~8 000 tokens per query |
+| Max input | Top-K chunks (default 5, at most 20) of about 800 tokens each plus question and prompt: roughly 4 000 tokens by default |
 | Output | Natural language answer with source citations |
 
 ### LLM — Content Generation (LinkedIn Publisher)
@@ -74,7 +74,7 @@ The following uses are explicitly **not supported**:
 - Making autonomous business decisions without human review
 - Providing legal, medical, financial, or compliance advice
 - Replacing professional judgment in regulated domains
-- Public-facing production use without additional security review
+- Public-facing production use without additional security review (the public demo at platform.bridging-data.com is a portfolio demonstration, not production use: it only searches the public namespaces, is throttled and is capped at 150 LLM-backed queries per day)
 
 ---
 
@@ -117,7 +117,7 @@ This allows spot-checking of grounding quality.
 
 **Cost monitoring:**  
 LLM call counts and token usage are bounded by per-pipeline limits configured in `settings.py`.
-AWS Budgets alerts are configured at 10 CHF (warning) and 25 CHF (critical).
+AWS Budgets sends e-mail alerts at 85 % and 100 % of a 50 USD monthly budget, the LLM provider account has a 10 USD monthly hard limit, and the public demo is capped at 150 LLM-backed queries per day.
 
 **Review cadence:**  
 Model configuration (provider, model ID) is reviewed when a new model version is released

@@ -191,7 +191,7 @@ The `docker/postgres/init.sql` script enables the `vector` and `uuid-ossp` exten
 ### PostgreSQL + pgvector (AWS RDS)
 
 - Engine: PostgreSQL 16 with `pgvector` extension
-- Instance: `db.t3.micro`, eu-central-1, free tier
+- Instance: `db.t3.micro`, eu-central-1 (about 18 USD per month per instance; not covered by the free tier)
 - Identifier: `ai-platform-db-v2`
 - Endpoint: `<RDS_ENDPOINT>:5432`
 - VPC: `ai-platform-vpc` (private subnets — no public endpoint)
@@ -368,12 +368,7 @@ Sources are seeded via `scripts/seed_radar_sources.py`. New sources can be added
 
 ## AWS Budget
 
-Monthly budget alerts configured via AWS Budgets:
-
-| Threshold | Action |
-|---|---|
-| 10 CHF / month | Warning alert |
-| 25 CHF / month | Critical alert |
+Current setting (2026-09-26): one monthly AWS budget of 50 USD with e-mail alerts at 85 % and 100 % of actual spend and at 100 % of forecast spend. The real run rate is about 96 USD per month (August 2026 including tax), so this budget is already exceeded and needs re-basing. The LLM provider account has a separate 10 USD monthly hard limit.
 
 Track: RDS storage, S3 storage, Lambda/ECS compute, LLM API usage, embedding API usage, API Gateway calls, CloudWatch logs.
 
@@ -385,7 +380,7 @@ Track: RDS storage, S3 storage, Lambda/ECS compute, LLM API usage, embedding API
 - **Chunking cap:** `MAX_CHUNKS_PER_DOC=1000` — prevents runaway costs on large documents
 - **LLM cap:** `MAX_LLM_CALLS_PER_RUN=100` per run
 - **Embedding cap:** `MAX_EMBEDDING_CALLS_PER_RUN=1000` per run
-- **Retention:** Raw docs 30–90 days, embeddings kept until source changes, logs 14–30 days
+- **Retention:** Raw articles and raw pages 30 days, embeddings kept until source changes, logs: 30-day target (not yet configured)
 - **Model selection:** `gpt-4o-mini` (chat) + `text-embedding-3-small` (embeddings) for cost efficiency
 
 ---
@@ -997,7 +992,7 @@ uv run uvicorn apps.private_hub.main:app --reload --port 8001 --host 127.0.0.1
 ### 20260616 — Phase 1 deployed to AWS
 
 **Completed today:**
-- RDS PostgreSQL 16 + pgvector provisioned in eu-central-1 (db.t3.micro, free tier)
+- RDS PostgreSQL 16 + pgvector provisioned in eu-central-1 (db.t3.micro; free tier at the time, now billed)
 - Docker images built: `Dockerfile` (standard) + `Dockerfile.lambda` (Lambda-optimized)
 - Lambda function deployed with Mangum ASGI adapter (container image)
 - API Gateway HTTP API live with CORS for bridging-data.com

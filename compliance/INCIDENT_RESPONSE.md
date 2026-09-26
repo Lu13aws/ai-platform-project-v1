@@ -49,9 +49,9 @@ containment, notification, and post-incident review.
 ## Detection
 
 **Monitoring sources:**
-- AWS CloudWatch: Lambda error rates, API Gateway 4xx/5xx rates, Lambda duration anomalies
-- AWS Budgets: alert at 10 CHF (warning) and 25 CHF (critical) — catches runaway costs
-- SNS email notifications: each pipeline sends success/failure emails
+- AWS CloudWatch: Lambda logs and error/duration metrics are available for manual review; no CloudWatch alarms are configured yet
+- AWS Budgets: one monthly budget (50 USD) with e-mail alerts at 85 % and 100 % of actual and at 100 % of forecast spend; LLM provider spending is capped separately by a monthly hard limit at the provider
+- SNS email notifications: the radar, competitor and regulatory pipelines send a run summary after each completed run. A run that ends with an unhandled error sends no e-mail, and the cleanup, content-creator and token-price Lambdas send none
 - Audit log review: `GET /corp/audit` endpoint shows all user actions on corporate data
 - Manual review: LinkedIn Review UI for drafted content before publication
 
@@ -60,7 +60,7 @@ containment, notification, and post-incident review.
 - AWS Budget threshold crossed without an expected pipeline run
 - Audit log entries with unexpected user IDs or IP addresses
 - Failed Cognito authentication attempts (visible in Cognito console)
-- API Gateway access logs showing unexpected traffic patterns (if CloudTrail is enabled)
+- Unexpected traffic patterns in Lambda logs and API Gateway metrics (API Gateway access logging is not enabled and no CloudTrail trail exists; only the 90-day CloudTrail event history is available)
 
 ---
 
@@ -76,20 +76,20 @@ containment, notification, and post-incident review.
 
 **Corporate prototype — data breach or authentication compromise:**
 1. Disable the Cognito user pool or specific user account via AWS Console
-2. Rotate `CORP_DATABASE_URL` secret in Secrets Manager and redeploy Lambda
+2. Rotate the database password and update `CORP_DATABASE_URL` in the secret `ai-platform/corp-app-secrets` (rotation is manual), then force a new cold start of `ai-platform-corp-api` (for example with `aws lambda update-function-configuration`) so it re-reads the secret
 3. Review audit log for the time window: `GET /corp/audit?limit=500`
-4. Revoke API Gateway usage if necessary (delete API key or disable stage)
+4. If necessary stop all traffic: `aws lambda put-function-concurrency --function-name ai-platform-corp-api --reserved-concurrent-executions 0` (tested on 2026-09-26 on another function; undo with `delete-function-concurrency`). HTTP APIs have no API keys or usage plans
 
 **Public API — abuse or injection:**
-1. Enable WAF blocking rule on affected API Gateway stage (if WAF is configured)
+1. Lower the route throttling on the affected API Gateway stage (AWS WAF cannot be attached to HTTP APIs)
 2. Restrict Lambda concurrency to 0 via AWS Console to halt traffic temporarily
 3. Review CloudWatch logs for the affected time window
 4. Re-enable after root cause is identified
 
 **Credential exposure (API keys, Secrets Manager):**
 1. Immediately rotate the exposed credential (OpenAI key, Anthropic key, DB password)
-2. Update the Lambda environment variable or Secrets Manager entry
-3. Redeploy affected Lambda function(s) to pick up new credentials
+2. Update the entry in Secrets Manager (`ai-platform/app-secrets`, `ai-platform/corp-app-secrets` or `linkedin/credentials`); the Lambda environments hold no API keys
+3. Force a new cold start of the affected Lambda function(s); secrets are read at cold start
 4. Audit usage of the exposed key with the provider (OpenAI usage dashboard, Anthropic console)
 
 **Content incident (harmful LinkedIn post published):**
@@ -152,7 +152,7 @@ For P1 and P2 incidents:
 | Role | Contact |
 |---|---|
 | Platform owner / data controller | Luciano — <OWNER_EMAIL> |
-| AWS account access | Via IAM with MFA |
+| AWS account access | Root account and the human IAM user use MFA. The CI user `github-actions-portfolio` uses a long-lived access key without MFA |
 | OpenAI support | https://help.openai.com |
 | Anthropic support | https://console.anthropic.com |
 
@@ -162,4 +162,5 @@ For P1 and P2 incidents:
 
 This incident response plan has not been formally tested with a tabletop exercise.
 For a production deployment with client data, a tabletop exercise covering the P1
-data breach scenario is recommended before go-live.
+data breach scenario is recommended before go-live. The only step tested so far is the
+Lambda concurrency-0 emergency stop (2026-09-26).

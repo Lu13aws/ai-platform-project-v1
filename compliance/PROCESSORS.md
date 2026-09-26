@@ -35,7 +35,7 @@ ingested. The only personal data that may reach third-party processors is:
 | **Data NOT sent** | Raw source documents; database contents; user credentials; audit logs |
 | **Processing location** | USA (data may be processed outside EEA) |
 | **Transfer mechanism** | Standard Contractual Clauses (SCCs) — included in OpenAI's DPA |
-| **Data retention by OpenAI** | API inputs/outputs not used for training by default; retained up to 30 days for abuse monitoring (per OpenAI API data usage policy) |
+| **Data retention by OpenAI** | API inputs/outputs not used for training by default; retained up to 30 days for abuse monitoring (per OpenAI API data usage policy as of June 2026; not re-verified) |
 | **DPA** | [OpenAI Data Processing Addendum](https://openai.com/policies/data-processing-addendum) |
 | **Privacy policy** | [openai.com/privacy](https://openai.com/privacy) |
 
@@ -43,7 +43,7 @@ ingested. The only personal data that may reach third-party processors is:
 
 | Use case | Data sent |
 |---|---|
-| Document embedding | Text chunks (≤ 512 tokens) from ingested documents |
+| Document embedding | Text chunks (default 800 tokens) from ingested documents |
 | Pipeline classification | Extracted article text for Adopt/Trial/Assess/Hold classification |
 | RAG answers (public demo) | Top-K retrieved chunks + user question |
 | RAG answers (corporate) | Top-K retrieved chunks from corporate documents + user question |
@@ -63,7 +63,7 @@ ingested. The only personal data that may reach third-party processors is:
 | **Data NOT sent** | Raw source documents; database contents; user credentials; audit logs |
 | **Processing location** | USA (data may be processed outside EEA) |
 | **Transfer mechanism** | Standard Contractual Clauses (SCCs) — included in Anthropic's DPA |
-| **Data retention by Anthropic** | API inputs/outputs not used for training without opt-in; retained up to 30 days (per Anthropic's usage policy) |
+| **Data retention by Anthropic** | API inputs/outputs not used for training without opt-in; retained up to 30 days (per Anthropic's usage policy as of June 2026; not re-verified) |
 | **DPA** | [Anthropic Data Processing Addendum](https://www.anthropic.com/legal/data-processing-addendum) |
 | **Privacy policy** | [anthropic.com/privacy](https://www.anthropic.com/privacy) |
 
@@ -82,12 +82,12 @@ the primary provider. Anthropic may be activated for specific components or as a
 | **Company** | Amazon Web Services EMEA SARL |
 | **Address** | 38 Avenue John F. Kennedy, L-1855 Luxembourg |
 | **Role** | Infrastructure sub-processor |
-| **Services used** | Lambda, RDS (PostgreSQL), S3, API Gateway, CloudWatch, Cognito, SES/SNS |
+| **Services used** | Lambda, RDS (PostgreSQL), S3, API Gateway, CloudWatch, Cognito, SNS, Secrets Manager, ECR, CloudFront, Route 53 |
 | **Data stored** | All platform data: document chunks, embeddings, signals, audit logs, reports |
 | **Processing location** | eu-central-1 (Frankfurt, Germany) |
 | **Transfer mechanism** | Data processed within EEA (Frankfurt region) |
 | **DPA** | [AWS Data Processing Addendum](https://aws.amazon.com/agreement/data-processing/) |
-| **Encryption** | At rest (RDS: AES-256); in transit (TLS 1.2+) |
+| **Encryption** | At rest (RDS: AES-256 with the AWS-managed key; S3: SSE-S3); in transit: TLS (minimum version not verified) |
 
 ---
 
@@ -113,7 +113,7 @@ The following measures limit the personal data exposure to sub-processors:
 
 As data controller, the platform owner:
 
-- Has reviewed the DPAs of OpenAI and Anthropic
+- Has reviewed the DPAs of OpenAI and Anthropic (owner statement; not technically verifiable)
 - Relies on Standard Contractual Clauses (SCCs) for transfers outside the EEA
 - Has not signed custom DPAs with these providers (using standard commercial terms)
 - Monitors provider policy changes for material updates to data handling

@@ -11,21 +11,24 @@ For the full Art. 30 legal record, see [ROPA.md](ROPA.md).
 
 | Data Category | Retention Period | Deleted By |
 |---|---|---|
-| Raw scraped articles (radar pipelines) | 30–90 days | CleanupAgent (automated, monthly) |
-| Technology / competitor / regulatory signals | 12 months | CleanupAgent (automated, monthly) |
-| Generated radar reports (HTML + JSON) | 12–24 months | CleanupAgent (automated, monthly) |
+| Raw scraped articles and competitor raw pages | 30 days | CleanupAgent (automated, monthly) |
+| Competitor signals | 12 months | CleanupAgent (automated, monthly) |
+| Technology radar entries; regulatory documents and detected changes | Kept: no automated deletion (regulatory version history is intentionally permanent) | Admin on request |
+| Generated reports (HTML + JSON: database row and S3 files) | Radar and regulatory: 24 months; competitor: 12 months | CleanupAgent (automated, monthly) |
 | Document embeddings (public RAG) | Until source document changes | Admin on request |
 | Corporate documents (uploaded by admin) | Until deleted on request | Admin via API or on request |
 | Corporate document embeddings | Deleted with parent document | Cascade delete (automatic) |
-| Audit logs (corporate prototype) | 12 months | Admin on request |
-| LinkedIn draft posts | Indefinite (small records) | Admin on request |
+| Audit logs (corporate prototype) | Target 12 months; no automated deletion | Admin on request |
+| LinkedIn draft posts | 12 months | CleanupAgent (automated, monthly) |
 | Platform agent heartbeats | Until next heartbeat overwrites | Automatic (self-replacing) |
+| User accounts (Cognito: e-mail address, group membership) | Until removed by the administrator | Admin |
+| CloudWatch logs (Lambda) | No expiry configured yet (target 30 days) | Not yet enforced |
 
 ---
 
 ## What We Do NOT Store
 
-- Personal data of customers, employees, or third parties
+- Personal data of customers, employees, or third parties (documented exceptions: e-mail addresses of registered platform users in Cognito; e-mail address and IP address of admin users in the corporate audit log; IP addresses may appear in service logs, see `ROPA.md`)
 - Financial records or transaction data of individuals
 - Health or sensitive personal data of any kind
 - Client project data (not ingested into this platform)
@@ -42,6 +45,10 @@ raw data that has exceeded its retention period. No manual action required.
 `DELETE /corp/documents/{id}`. This cascades to remove all associated chunks and embeddings.
 Every deletion is audit-logged with a GDPR Art. 17 notation.
 
-**Backup retention:** AWS RDS automated backups are retained for 7 days by default.
-Deleted data may remain in backups until the backup window expires. AWS manages and
-secures these backups — they are not accessible to end users.
+**Backup retention:** RDS automated backups are retained for 1 day on both database instances.
+Manual snapshots are kept until they are deleted (for example the snapshot taken before the
+June 2026 VPC migration). Deleted data may therefore remain in a snapshot until that snapshot
+is deleted. Snapshots are encrypted and not accessible to end users.
+
+**Public reports:** the report files under `radar/`, `competitor/`, `regulatory/` and
+`token-prices/` in the S3 bucket are publicly readable by design (public information only).

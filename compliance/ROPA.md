@@ -4,7 +4,8 @@
 **Version:** 1.0  
 **Date:** June 2026  
 **Controller:** Luciano (<OWNER_EMAIL>)  
-**Platform:** AI Knowledge & Intelligence Platform (ai-platform-project-v1)
+**Platform:** AI Knowledge & Intelligence Platform (ai-platform-project-v1)  
+**Verification:** retention periods and storage statements re-checked against the code and the AWS account on 2026-09-26 (see `CLAIMS_VERIFICATION.md`)
 
 ---
 
@@ -46,7 +47,7 @@
 | **Data subjects** | None — only organisational/product information, no personal data |
 | **Source** | RSS feeds and public web pages from vendor websites |
 | **Recipients** | OpenAI (classification of scraped article text) |
-| **Retention** | Raw articles: 30–90 days; summaries: 12 months; reports: 12–24 months |
+| **Retention** | Raw articles: 30 days; radar entries: kept (no automated deletion); reports: 24 months (automated) |
 | **Storage** | AWS RDS PostgreSQL `ai-platform-db-v2`, S3 (eu-central-1) |
 | **Encryption** | At rest (AES-256); in transit (TLS) |
 
@@ -62,7 +63,7 @@
 | **Data subjects** | None — only institutional/regulatory documents |
 | **Source** | Public government and standards body websites |
 | **Recipients** | OpenAI (LLM-based impact analysis of document diffs) |
-| **Retention** | Source documents: permanent (version history required); reports: permanent |
+| **Retention** | Source documents and detected changes: permanent (version history required); reports: 24 months (automated) |
 | **Storage** | AWS RDS PostgreSQL `ai-platform-db-v2`, S3 (eu-central-1) |
 | **Encryption** | At rest (AES-256); in transit (TLS) |
 
@@ -78,7 +79,7 @@
 | **Data subjects** | None — only organisational and product information |
 | **Source** | Publicly accessible company websites |
 | **Recipients** | OpenAI (signal classification) |
-| **Retention** | Raw pages: 30–180 days; signals: 12 months; reports: 12 months |
+| **Retention** | Raw pages: 30 days; signals: 12 months; reports: 12 months (all automated) |
 | **Storage** | AWS RDS PostgreSQL `ai-platform-db-v2`, S3 (eu-central-1) |
 | **Encryption** | At rest (AES-256); in transit (TLS) |
 
@@ -109,7 +110,7 @@
 | **Data categories** | Summarised platform signals (radar, competitor, regulatory) used as prompt input |
 | **Data subjects** | None — signals are about companies/technologies, not individuals |
 | **Recipients** | OpenAI (content generation), LinkedIn (publication via API) |
-| **Retention** | Drafts: kept indefinitely; published post URL stored in database |
+| **Retention** | Drafts and published-post records: 12 months (automated) |
 | **Storage** | AWS RDS PostgreSQL `ai-platform-db-v2` |
 | **Encryption** | At rest (AES-256); in transit (TLS) |
 | **Human review** | All drafts reviewed and manually approved before publication |
@@ -126,11 +127,26 @@
 | **Data subjects** | Admin users of the corporate system (email address captured in audit log) |
 | **Source** | Manually ingested internal documents via `POST /corp/ingest` |
 | **Recipients** | OpenAI (embedding + LLM inference for RAG) — document chunks only, not audit logs |
-| **Retention** | Documents: until deleted on request (GDPR Art. 17); audit logs: 12 months |
+| **Retention** | Documents: until deleted on request (GDPR Art. 17); audit logs: target 12 months, deleted manually (no automated expiry) |
 | **Storage** | AWS RDS PostgreSQL `ai-platform-db-corp` (isolated instance, encrypted) |
 | **Encryption** | At rest (AES-256); in transit (TLS); database credentials in Secrets Manager |
 | **Access control** | Cognito authentication (`ai-platform-corp-users`); `corp-admins` group RBAC |
 | **Deletion** | `DELETE /corp/documents/{id}` implements GDPR Art. 17 with cascade and audit trail |
+
+---
+
+## Processing Activity 8: Platform User Accounts
+
+| Field | Detail |
+|---|---|
+| **Purpose** | Sign-in to platform.bridging-data.com for the protected areas (LinkedIn review, ingestion, corporate demo) |
+| **Legal basis** | Voluntary registration / legitimate interest in access control (to be confirmed by the controller) |
+| **Data categories** | E-mail address, Cognito user ID, group membership; sign-in metadata handled by Cognito |
+| **Data subjects** | Visitors who register (pool `ai-platform-public`, self-registration enabled, 2 accounts on 2026-09-26); corporate admin (pool `ai-platform-corp-users`, 1 account) |
+| **Recipients** | AWS (Cognito) only; not sent to OpenAI or Anthropic |
+| **Retention** | Until the account is deleted by the administrator; no automatic expiry |
+| **Storage** | Amazon Cognito (eu-central-1) |
+| **Known gaps** | No privacy notice on the login page; MFA is not enabled |
 
 ---
 
@@ -140,7 +156,7 @@
 |---|---|---|---|
 | OpenAI (USA) | Embeddings API, Chat Completions API | Document text chunks, user questions | [OpenAI DPA](https://openai.com/policies/data-processing-addendum) |
 | Anthropic (USA) | Messages API (configurable alternative) | Document text chunks, user questions | [Anthropic DPA](https://www.anthropic.com/legal/data-processing-addendum) |
-| AWS (Frankfurt) | Lambda, RDS, S3, API Gateway, Cognito, SES/SNS | All platform data | [AWS DPA](https://aws.amazon.com/agreement/data-processing/) |
+| AWS (Frankfurt; CloudFront and Route 53 are global services) | Lambda, RDS, S3, API Gateway, Cognito, SNS, Secrets Manager, CloudWatch, ECR, CloudFront, Route 53 | All platform data | [AWS DPA](https://aws.amazon.com/agreement/data-processing/) |
 | LinkedIn (USA) | LinkedIn Content API | Post text only (after human approval) | [LinkedIn Privacy Policy](https://www.linkedin.com/legal/privacy-policy) |
 
 Full sub-processor details: see [PROCESSORS.md](PROCESSORS.md)
