@@ -1,3 +1,4 @@
+from aiplatform.quota import register_quota_handler
 from aiplatform.settings import settings
 from aiplatform.storage.models import Base
 from apps.knowledge_platform.api.routes import router as kp_router
@@ -9,6 +10,7 @@ from sqlalchemy import create_engine as _create_sync_engine
 
 # Import all model modules so their tables are registered with Base.metadata.
 import aiplatform.storage.content_models  # noqa: F401
+import aiplatform.storage.usage_models  # noqa: F401
 
 # Create any missing tables on Lambda cold start using a sync psycopg2 engine.
 # Uses ALEMBIC_DATABASE_URL (postgresql://... ?sslmode=require) which is the
@@ -24,6 +26,7 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc",
 )
+register_quota_handler(app)
 
 _PRODUCTION_ORIGINS = [
     "https://bridging-data.com",

@@ -135,6 +135,8 @@ class Settings(BaseSettings):
 
     max_llm_calls_per_run: int = Field(default=100, ge=1)
     max_embedding_calls_per_run: int = Field(default=1000, ge=1)
+    # Global daily cap (UTC day) on LLM requests from unauthenticated public endpoints
+    public_daily_llm_limit: int = Field(default=150, ge=1)
 
     # ── Notifications ─────────────────────────────────────────────────────────
 

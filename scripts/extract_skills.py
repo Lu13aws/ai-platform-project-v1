@@ -17,16 +17,22 @@ import argparse
 import asyncio
 import hashlib
 import json
+import logging
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
 import httpx
 import yaml
+from botocore.auth import SigV4Auth
+from botocore.awsrequest import AWSRequest
+from botocore.session import get_session
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from aiplatform.llm import Message, get_llm_provider
+
+logger = logging.getLogger(__name__)
 
 _SYSTEM_PROMPT = """\
 You are a skill documentation agent. Given the content of a project file, extract ONE reusable engineering skill.
@@ -335,15 +341,21 @@ async def main(config_path: str, dry_run: bool) -> None:
         # Report last-run to Agent Center
         heartbeat_url = f"{api_base}/api/v1/kp/agent-heartbeat"
         try:
+            payload = json.dumps({
+                "agent_name": "skill_extraction_agent",
+                "skills_extracted": stats.extracted,
+                "skills_reindexed": stats.reindexed,
+                "errors": stats.errors,
+            })
+            req = AWSRequest("POST", heartbeat_url, data=payload,
+                             headers={"Content-Type": "application/json"})
+            SigV4Auth(get_session().get_credentials().get_frozen_credentials(),
+                      "execute-api", "eu-central-1").add_auth(req)
             async with httpx.AsyncClient(timeout=15.0) as hb_client:
-                await hb_client.post(heartbeat_url, json={
-                    "agent_name": "skill_extraction_agent",
-                    "skills_extracted": stats.extracted,
-                    "skills_reindexed": stats.reindexed,
-                    "errors": stats.errors,
-                })
-        except Exception:
-            pass  # Heartbeat failure should not break the run
+                resp = await hb_client.post(heartbeat_url, content=payload, headers=dict(req.headers))
+                resp.raise_for_status()
+        except Exception as exc:  # heartbeat failure must not break the run
+            logger.warning("Agent Center heartbeat failed (%s): %s", type(exc).__name__, exc)
 
     print(f"Done: {stats}")
     if stats.new_skills:

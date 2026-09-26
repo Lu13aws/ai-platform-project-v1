@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
+from aiplatform.quota import register_quota_handler
 from apps.knowledge_platform.api.routes import router
 
 app = FastAPI(
@@ -10,6 +11,7 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc",
 )
+register_quota_handler(app)
 
 app.add_middleware(
     CORSMiddleware,

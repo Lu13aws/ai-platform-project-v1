@@ -6,13 +6,23 @@ async function get<T>(path: string): Promise<T> {
   return res.json() as Promise<T>
 }
 
+export class RateLimitError extends Error {}
+
 async function post<T>(path: string, body: unknown): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   })
-  if (!res.ok) throw new Error(`POST ${path} → ${res.status}`)
+  if (!res.ok) {
+    if (res.status === 429) {
+      const data = await res.json().catch(() => null)
+      throw new RateLimitError(
+        data?.detail ?? 'The demo is receiving too many requests right now. Please try again in a moment.'
+      )
+    }
+    throw new Error(`POST ${path} → ${res.status}`)
+  }
   return res.json() as Promise<T>
 }
 

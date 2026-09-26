@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from aiplatform.auth.cognito import get_current_user, require_admin
+from aiplatform.quota import consume_public_query_quota
 from aiplatform.storage.database import get_session
 from apps.knowledge_platform.api.schemas import (
     AgentHeartbeatRequest,
@@ -78,6 +79,7 @@ async def query(
     request: QueryRequest,
     session: AsyncSession = Depends(get_session),
 ) -> QueryResponse:
+    await consume_public_query_quota()
     service = QueryService(session, app_name=None)
     return await service.query(request)
 

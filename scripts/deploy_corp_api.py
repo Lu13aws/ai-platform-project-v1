@@ -50,6 +50,11 @@ COGNITO_ISSUER = f"https://cognito-idp.{REGION}.amazonaws.com/{COGNITO_USER_POOL
 _BASIC_POLICY = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 _VPC_POLICY = "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
 
+# Default throttle for the whole corp API (JWT routes, /health and the $default catch-all).
+# Unauthenticated noise on /health and $default still invokes the Lambda, which shares the
+# account-wide limit of 10 concurrent executions with all other functions.
+_DEFAULT_THROTTLE = {"ThrottlingRateLimit": 5, "ThrottlingBurstLimit": 10}
+
 
 def get_ecr_image_uri(ecr) -> str:
     """Get the latest image URI from ECR (same image as all other Lambdas)."""
@@ -310,6 +315,9 @@ def setup_routes(apigw, lambda_client, api_id: str, auth_id: str, fn_arn: str) -
         print("  [apigw] stage '$default' created with AutoDeploy")
     except apigw.exceptions.ConflictException:
         print("  [apigw] stage '$default' already exists")
+
+    apigw.update_stage(ApiId=api_id, StageName="$default", DefaultRouteSettings=_DEFAULT_THROTTLE)
+    print("  [apigw] default throttling applied (5 rps / burst 10)")
 
 
 def main() -> None:

@@ -1,4 +1,5 @@
 from aiplatform.auth.cognito import get_current_user
+from aiplatform.quota import consume_public_query_quota
 from aiplatform.retrieval.embedder import CostLimitExceeded
 from aiplatform.storage.database import get_session
 from apps.rag_demo.api.schemas import (
@@ -37,6 +38,7 @@ async def query_documents(
     session: AsyncSession = Depends(get_session),
 ) -> QueryResponse:
     """Answer a question using retrieved context and the configured LLM."""
+    await consume_public_query_quota()
     try:
         return await QueryService(session).query(request)
     except CostLimitExceeded as exc:

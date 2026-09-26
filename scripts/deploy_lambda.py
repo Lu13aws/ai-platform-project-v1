@@ -60,6 +60,27 @@ _PROTECTED_ROUTES = [
     "POST /api/v1/ingest",
 ]
 
+# Unauthenticated routes get their own throttling bucket instead of sharing $default.
+# API Gateway throttling is best-effort (measured ~0.65 rps for rate 0.2): it limits bursts and
+# concurrency, the real cost cap is the daily quota in aiplatform/quota.py.
+_PUBLIC_ROUTES = ["POST /api/v1/kp/query", "POST /api/v1/query"]
+# Signed with SigV4 by scripts/extract_skills.py; unsigned calls are rejected at the gateway.
+_IAM_ROUTES = ["POST /api/v1/kp/agent-heartbeat"]
+_ROUTE_THROTTLES = {
+    "POST /api/v1/kp/query": {"ThrottlingRateLimit": 0.2, "ThrottlingBurstLimit": 5},
+    "POST /api/v1/query": {"ThrottlingRateLimit": 0.2, "ThrottlingBurstLimit": 5},
+    "POST /api/v1/kp/agent-heartbeat": {"ThrottlingRateLimit": 0.1, "ThrottlingBurstLimit": 2},
+}
+_DEFAULT_THROTTLE = {"ThrottlingRateLimit": 20, "ThrottlingBurstLimit": 40}
+
+
+def load_sns_config() -> str:
+    path = Path("infra/sns_config.json")
+    if not path.exists():
+        print("  [info] infra/sns_config.json not found — notifications disabled")
+        return ""
+    return json.loads(path.read_text()).get("topic_arn", "")
+
 
 def load_vpc_config() -> dict | None:
     path = Path("infra/vpc_config.json")
@@ -111,6 +132,8 @@ def build_env_vars() -> dict[str, str]:
         "OPENAI_EMBEDDING_DIMENSIONS": str(settings.openai_embedding_dimensions),
         "RETRIEVAL_SIMILARITY_THRESHOLD": str(settings.retrieval_similarity_threshold),
         "MAX_CHUNKS_PER_DOC": str(settings.max_chunks_per_doc),
+        "PUBLIC_DAILY_LLM_LIMIT": str(settings.public_daily_llm_limit),
+        "SNS_TOPIC_ARN": load_sns_config(),
     }
 
 
@@ -181,6 +204,10 @@ def deploy_api_gateway(apigw, lmb, fn_arn: str) -> tuple[str, str]:
         print(f"  [ok] API already exists: {existing['ApiEndpoint']}")
         return existing["ApiId"], existing["ApiEndpoint"]
 
+    # NOTE: CORS is only applied here, when the API is FIRST created. The live API was changed
+    # afterwards (it also allows https://platform.bridging-data.com and the DELETE/PATCH/OPTIONS
+    # methods) and re-running this script does NOT update it. Before recreating the API from
+    # scratch, copy the live values: aws apigatewayv2 get-api --api-id <API_ID> --query CorsConfiguration
     api = apigw.create_api(
         Name=FUNCTION_NAME,
         ProtocolType="HTTP",
@@ -277,6 +304,27 @@ def setup_protected_routes(apigw, lmb, api_id: str, auth_id: str, fn_arn: str) -
             AuthorizerId=auth_id,
         )
         print(f"  [apigw] route created: {route_key} (auth=JWT)")
+
+    open_routes = [(k, "NONE") for k in _PUBLIC_ROUTES] + [(k, "AWS_IAM") for k in _IAM_ROUTES]
+    for route_key, auth_type in open_routes:
+        if route_key in existing_routes:
+            print(f"  [apigw] route exists: {route_key}")
+            continue
+        apigw.create_route(
+            ApiId=api_id,
+            RouteKey=route_key,
+            Target=f"integrations/{integration_id}",
+            AuthorizationType=auth_type,
+        )
+        print(f"  [apigw] route created: {route_key} (auth={auth_type})")
+
+    apigw.update_stage(
+        ApiId=api_id,
+        StageName="$default",
+        RouteSettings=_ROUTE_THROTTLES,
+        DefaultRouteSettings=_DEFAULT_THROTTLE,
+    )
+    print("  [apigw] throttling applied")
 
 
 def main() -> None:

@@ -5,7 +5,7 @@ import { useSearchParams } from 'next/navigation'
 import { Send, Loader2, ChevronDown, ChevronRight } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { api, QueryResponse } from '@/lib/api'
+import { api, QueryResponse, RateLimitError } from '@/lib/api'
 
 type Message =
   | { role: 'user'; content: string }
@@ -86,7 +86,7 @@ function ChatPageInner() {
         {
           role: 'assistant',
           response: {
-            answer: `Error: ${String(e)}`,
+            answer: e instanceof RateLimitError ? e.message : `Error: ${String(e)}`,
             sources: [],
             model: '',
             input_tokens: 0,
