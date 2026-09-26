@@ -23,13 +23,14 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from io import BytesIO
 from typing import Any
-from xml.etree import ElementTree
 
 import httpx
 from bs4 import BeautifulSoup
+from defusedxml import ElementTree
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from aiplatform.agents.fetch_utils import check_response_size
 from aiplatform.storage.competitor_models import (
     CompetitorRawContent,
     CompetitorSignal,
@@ -224,6 +225,7 @@ async def _fetch_blog(
     """Fetch blog/news via RSS or HTML scraping."""
     response = await client.get(source.url)
     response.raise_for_status()
+    check_response_size(response)
 
     content_type = response.headers.get("content-type", "")
     if "xml" in content_type or "rss" in content_type or source.url.endswith((".xml", ".rss")):
@@ -303,6 +305,7 @@ async def _fetch_pricing(
     """Hash-compare pricing page — return signal only if content changed."""
     response = await client.get(source.url)
     response.raise_for_status()
+    check_response_size(response)
 
     soup = BeautifulSoup(response.text, "lxml")
     for tag in soup(["script", "style", "nav", "footer", "header", "noscript"]):

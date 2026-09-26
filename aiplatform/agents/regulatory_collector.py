@@ -23,6 +23,7 @@ from bs4 import BeautifulSoup
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from aiplatform.agents.fetch_utils import check_response_size
 from aiplatform.storage.regulatory_models import RegulatoryDocument, RegulatorySource
 from aiplatform.storage.s3 import S3Client
 
@@ -139,6 +140,7 @@ class RegulatoryCollectorAgent:
     async def _fetch(self, client: httpx.AsyncClient, source: RegulatorySource) -> _FetchedDocument:
         response = await client.get(source.url)
         response.raise_for_status()
+        check_response_size(response)
 
         if source.source_type == "pdf":
             text = _extract_pdf_text(response.content)

@@ -17,10 +17,12 @@ from urllib.parse import urlparse
 
 import httpx
 from bs4 import BeautifulSoup
+from defusedxml.ElementTree import fromstring as safe_xml_fromstring
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from aiplatform.storage.radar_models import RawArticle, RadarSource
+from aiplatform.agents.fetch_utils import check_response_size
+from aiplatform.storage.radar_models import RadarSource, RawArticle
 
 _RETENTION_DAYS = 30
 _MAX_ARTICLES_PER_SOURCE = 20
@@ -111,8 +113,9 @@ class CollectorAgent:
     async def _fetch_rss(self, client: httpx.AsyncClient, feed_url: str) -> list[_ArticleData]:
         response = await client.get(feed_url)
         response.raise_for_status()
+        check_response_size(response)
 
-        root = ET.fromstring(response.content)
+        root = safe_xml_fromstring(response.content)
         articles: list[_ArticleData] = []
 
         # RSS 2.0: <rss><channel><item>
@@ -165,6 +168,7 @@ class CollectorAgent:
     async def _fetch_html(self, client: httpx.AsyncClient, url: str) -> list[_ArticleData]:
         response = await client.get(url)
         response.raise_for_status()
+        check_response_size(response)
 
         soup = BeautifulSoup(response.text, "lxml")
         base = urlparse(url)

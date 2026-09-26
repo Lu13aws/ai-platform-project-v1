@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from aiplatform.agents.report_utils import esc as _esc
 from aiplatform.storage.radar_models import RadarEntry, RadarReport, RadarSignal, RadarSource
 from aiplatform.storage.s3 import S3Client
 
@@ -262,12 +263,3 @@ def _render_changes_section(change_report: "ChangeReport | None") -> str:
         <tbody>{rows}</tbody>
       </table>
     </section>"""
-
-
-def _esc(text: str) -> str:
-    return (
-        text.replace("&", "&amp;")
-            .replace("<", "&lt;")
-            .replace(">", "&gt;")
-            .replace('"', "&quot;")
-    )

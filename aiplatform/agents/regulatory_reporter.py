@@ -17,6 +17,8 @@ from datetime import UTC, datetime
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from aiplatform.agents.report_utils import esc as _esc
+from aiplatform.agents.report_utils import safe_href
 from aiplatform.storage.regulatory_models import (
     RegulatoryChange,
     RegulatoryDocument,
@@ -291,7 +293,7 @@ def _render_sources(sources: list[dict]) -> str:
         domain_color = _DOMAIN_COLORS.get(s["domain"], "#64748b")
         manual_tag = ' <span style="font-size:0.7rem;color:#64748b;background:#1e293b;border:1px solid #334155;border-radius:4px;padding:1px 5px;">manual</span>' if s.get("is_manual") else ""
         name_cell = (
-            f'<a href="{_esc(s["url"])}" style="color:#38bdf8; text-decoration:none;">{_esc(s["name"])}</a>'
+            f'<a href="{safe_href(s["url"])}" style="color:#38bdf8; text-decoration:none;">{_esc(s["name"])}</a>'
             if s["url"]
             else f'<span style="color:#cbd5e1;">{_esc(s["name"])}</span>'
         )
@@ -319,13 +321,3 @@ def _source_name(sources: list, source_id: object) -> str:
         if s.id == source_id:
             return s.name
     return str(source_id)
-
-
-def _esc(text: str) -> str:
-    return (
-        str(text)
-        .replace("&", "&amp;")
-        .replace("<", "&lt;")
-        .replace(">", "&gt;")
-        .replace('"', "&quot;")
-    )
