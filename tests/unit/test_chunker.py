@@ -1,6 +1,7 @@
 import pytest
 
 from aiplatform.ingestion.chunker import Chunker
+from aiplatform.settings import settings
 
 
 def test_split_basic():
@@ -35,9 +36,11 @@ def test_split_passes_metadata_to_all_chunks():
     assert all(c.metadata["source"] == "test.pdf" for c in chunks)
 
 
-def test_split_raises_when_chunk_limit_exceeded():
+def test_split_raises_when_chunk_limit_exceeded(monkeypatch):
+    # Pin the limit: the real value comes from MAX_CHUNKS_PER_DOC in the local .env / environment.
+    monkeypatch.setattr(settings, "max_chunks_per_doc", 100)
     chunker = Chunker(chunk_size=10, chunk_overlap=2)
-    # Tiny chunk size + long text → many chunks
+    # Tiny chunk size + long text → far more than 100 chunks
     text = "word " * 5000
     with pytest.raises(ValueError, match="exceeding the limit"):
         chunker.split(text)

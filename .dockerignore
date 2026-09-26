@@ -23,6 +23,12 @@ scripts/
 tests/
 notebooks/
 
+# Next.js UI: built and deployed by GitHub Actions (S3/CloudFront), never runs in Lambda.
+# Without this, node_modules + .next add ~900 MB to every Lambda image.
+apps/knowledge_platform_ui/
+**/node_modules/
+**/.next/
+
 # Git
 .git/
 .gitignore

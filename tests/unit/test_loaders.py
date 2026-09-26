@@ -8,6 +8,7 @@ from aiplatform.ingestion.loaders import (
     CSVLoader,
     HTMLLoader,
     JSONLoader,
+    MarkdownLoader,
     TextLoader,
     get_loader,
     validate_source_path,
@@ -29,11 +30,16 @@ async def test_text_loader_txt():
     assert doc.mime_type == "text/plain"
 
 
-async def test_text_loader_md():
-    path = write_temp(".md", "# Title\n\nSome content")
-    doc = await TextLoader().load(path)
+async def test_markdown_loader_strips_syntax():
+    path = write_temp(".md", "# Title\n\nSome **bold** content")
+    doc = await MarkdownLoader().load(path)
     assert doc.mime_type == "text/markdown"
-    assert "Title" in doc.content
+    assert doc.content == "Title\n\nSome bold content"
+
+
+def test_text_loader_leaves_markdown_to_markdown_loader():
+    assert not TextLoader().supports("notes.md")
+    assert MarkdownLoader().supports("notes.md")
 
 
 async def test_html_loader_strips_tags():
@@ -67,7 +73,7 @@ def test_get_loader_returns_correct_loader():
     assert type(get_loader("file.pdf")).__name__ == "PDFLoader"
     assert type(get_loader("file.docx")).__name__ == "DOCXLoader"
     assert type(get_loader("file.txt")).__name__ == "TextLoader"
-    assert type(get_loader("file.md")).__name__ == "TextLoader"
+    assert type(get_loader("file.md")).__name__ == "MarkdownLoader"
     assert type(get_loader("file.html")).__name__ == "HTMLLoader"
     assert type(get_loader("file.csv")).__name__ == "CSVLoader"
     assert type(get_loader("file.json")).__name__ == "JSONLoader"
