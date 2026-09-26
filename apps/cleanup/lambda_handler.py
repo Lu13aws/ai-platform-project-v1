@@ -11,6 +11,7 @@ import json
 import traceback
 
 from aiplatform.agents.cleanup import CleanupAgent
+from aiplatform.smoke import handle_smoke_test
 from aiplatform.storage.database import get_async_session
 
 
@@ -26,6 +27,9 @@ async def _run_cleanup() -> dict:
 
 
 def handler(event, context):
+    smoke = handle_smoke_test(event, "cleanup")
+    if smoke is not None:
+        return smoke
     try:
         result = asyncio.run(_run_cleanup())
         print(f"[cleanup] done: {result}")

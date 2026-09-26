@@ -24,6 +24,7 @@ import json
 import traceback
 
 from aiplatform.agents.token_price_reporter import TokenPriceReporterAgent
+from aiplatform.smoke import handle_smoke_test
 from aiplatform.storage.database import engine, get_async_session
 
 
@@ -63,6 +64,9 @@ async def _run_pipeline() -> dict:
 
 
 def handler(event, context):
+    smoke = handle_smoke_test(event, "token-price-pipeline")
+    if smoke is not None:
+        return smoke
     action = (event or {}).get("action", "run")
     try:
         if action == "migrate":

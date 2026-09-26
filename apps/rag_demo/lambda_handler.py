@@ -1,5 +1,6 @@
 import asyncio
 
+from aiplatform.smoke import handle_smoke_test
 from apps.rag_demo.main import app
 from mangum import Mangum
 
@@ -62,6 +63,9 @@ async def _integrity_check() -> dict:
 
 
 def handler(event, context):
+    smoke = handle_smoke_test(event, "rag-demo")
+    if smoke is not None:
+        return smoke
     # Direct-invoke actions: API Gateway events never carry a top-level "action" key,
     # so these are reachable only with lambda:InvokeFunction, not over HTTP.
     if event.get("action") == "run_migrations":

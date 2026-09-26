@@ -12,6 +12,7 @@ import json
 import traceback
 
 from aiplatform.agents.content_creator_agent import ContentCreatorAgent
+from aiplatform.smoke import handle_smoke_test
 from aiplatform.storage.database import get_async_session
 
 
@@ -31,6 +32,9 @@ async def _run_pipeline() -> dict:
 
 
 def handler(event, context):
+    smoke = handle_smoke_test(event, "content-creator")
+    if smoke is not None:
+        return smoke
     try:
         result = asyncio.run(_run_pipeline())
         print(f"[pipeline] draft saved: {result}")

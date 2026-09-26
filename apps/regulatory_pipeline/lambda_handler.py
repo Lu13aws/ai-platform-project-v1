@@ -23,6 +23,7 @@ from aiplatform.agents.regulatory_collector import RegulatoryCollectorAgent
 from aiplatform.agents.regulatory_notifier import RegulatoryNotifierAgent
 from aiplatform.agents.regulatory_reporter import RegulatoryReporterAgent
 from aiplatform.agents.report_indexer import ReportIndexerAgent
+from aiplatform.smoke import handle_smoke_test
 from aiplatform.storage.database import engine, get_async_session
 
 
@@ -66,6 +67,9 @@ async def _run_pipeline() -> dict:
 
 
 def handler(event, context):
+    smoke = handle_smoke_test(event, "regulatory-pipeline")
+    if smoke is not None:
+        return smoke
     try:
         results = asyncio.run(_run_pipeline())
         return {

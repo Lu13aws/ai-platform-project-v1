@@ -26,6 +26,7 @@ from aiplatform.agents.collector import CollectorAgent
 from aiplatform.agents.notifier import NotifierAgent
 from aiplatform.agents.report_indexer import ReportIndexerAgent
 from aiplatform.agents.reporter import ReporterAgent
+from aiplatform.smoke import handle_smoke_test
 from aiplatform.storage.database import (  # get_async_session: pipeline phases
     engine,
     get_async_session,
@@ -90,6 +91,9 @@ async def _run_pipeline() -> tuple[dict, ChangeReport | None]:
 
 
 def handler(event, context):
+    smoke = handle_smoke_test(event, "radar-pipeline")
+    if smoke is not None:
+        return smoke
     try:
         results, _ = asyncio.run(_run_pipeline())
         return {
