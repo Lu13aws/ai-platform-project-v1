@@ -170,7 +170,7 @@ def test_list_documents_action_returns_the_metadata(lambda_handler, monkeypatch)
     result = lambda_handler.handler({"action": "list_documents", "app_name": "private_hub"}, None)
 
     assert result == {"status": "ok", "app_name": "private_hub", "count": 1, "documents": docs}
-    listing.assert_awaited_once_with("private_hub")
+    listing.assert_awaited_once_with("private_hub", False)
     asyncio.get_event_loop_policy().get_event_loop()  # loop is usable again for the next HTTP request
 
 
@@ -236,3 +236,17 @@ def test_a_loop_bound_resource_survives_an_action_between_two_http_requests(lamb
         assert lambda_handler.handler(event, None)["statusCode"] == 200
     finally:
         loop.close()
+
+
+def test_list_documents_can_include_the_content_hash_but_never_the_content(lambda_handler, monkeypatch):
+    listing = AsyncMock(return_value=[])
+    monkeypatch.setattr(lambda_handler, "_list_documents", listing)
+
+    lambda_handler.handler({"action": "list_documents", "app_name": "skills_hub", "include_hash": True}, None)
+    listing.assert_awaited_once_with("skills_hub", True)
+
+    from aiplatform.storage.integrity import DOCUMENTS_SQL, DOCUMENTS_WITH_HASH_SQL
+
+    assert "content_hash" not in DOCUMENTS_SQL  # default stays hash-free
+    assert "d.content_hash" in DOCUMENTS_WITH_HASH_SQL
+    assert "d.content " not in DOCUMENTS_WITH_HASH_SQL  # the text itself is never selected

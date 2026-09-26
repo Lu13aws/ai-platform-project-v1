@@ -63,14 +63,14 @@ async def _integrity_check() -> dict:
         await engine.dispose()
 
 
-async def _list_documents(app_name: str) -> list[dict]:
+async def _list_documents(app_name: str, include_hash: bool = False) -> list[dict]:
     """Read-only document metadata (no content) of one namespace."""
     from aiplatform.storage.database import create_oneshot_engine
     from aiplatform.storage.integrity import list_document_metadata
 
     engine = create_oneshot_engine()
     try:
-        return await list_document_metadata(engine, app_name)
+        return await list_document_metadata(engine, app_name, include_hash)
     finally:
         await engine.dispose()
 
@@ -102,7 +102,7 @@ def handler(event, context):
         app_name = event.get("app_name")
         if not isinstance(app_name, str) or not app_name:
             return {"status": "error", "error": "list_documents needs a non-empty app_name"}
-        documents = run_preserving_loop(_list_documents(app_name))
+        documents = run_preserving_loop(_list_documents(app_name, event.get("include_hash") is True))
         return {"status": "ok", "app_name": app_name, "count": len(documents), "documents": documents}
     if event.get("action") == "delete_namespace":
         from aiplatform.storage.namespace_delete import NamespaceDeleteRefused

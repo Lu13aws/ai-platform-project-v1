@@ -49,9 +49,20 @@ SELECT CAST(d.id AS TEXT)           AS id,
 """
 
 
-async def list_document_metadata(engine: AsyncEngine, app_name: str) -> list[dict]:
-    """Title, source_uri, type, date and chunk count per document of one namespace. No content."""
+DOCUMENTS_WITH_HASH_SQL = DOCUMENTS_SQL.replace(
+    "d.mime_type                  AS mime_type,",
+    "d.mime_type                  AS mime_type,\n       d.content_hash               AS content_hash,",
+)
+
+
+async def list_document_metadata(engine: AsyncEngine, app_name: str, include_hash: bool = False) -> list[dict]:
+    """Title, source_uri, type, date and chunk count per document of one namespace. No content.
+
+    include_hash adds the SHA-256 content hash (a fingerprint, never the text) so an operator can compare
+    the stored documents with the source files.
+    """
+    sql = DOCUMENTS_WITH_HASH_SQL if include_hash else DOCUMENTS_SQL
     async with engine.connect() as conn:
         await conn.execute(text("SET TRANSACTION READ ONLY"))
-        rows = (await conn.execute(text(DOCUMENTS_SQL), {"app_name": app_name})).mappings()
+        rows = (await conn.execute(text(sql), {"app_name": app_name})).mappings()
         return [dict(row) for row in rows]
