@@ -20,7 +20,7 @@ class QueryService:
     def __init__(
         self,
         session: AsyncSession,
-        app_name: str = "rag_demo",
+        app_name: str | list[str] | None = "rag_demo",
         system_prompt: str = _RAG_SYSTEM_PROMPT,
         similarity_threshold: float | None = None,
     ) -> None:

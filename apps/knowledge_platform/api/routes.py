@@ -42,6 +42,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter(prefix="/kp", tags=["knowledge-platform"])
 
+# Namespaces the unauthenticated AI chat may search. The shared database also holds other
+# namespaces (private_hub, consulting, ...), which must never be reachable from a public route.
+PUBLIC_QUERY_NAMESPACES = ("rag_demo", "skills_hub", "knowledge_platform")
+
 
 @router.get("/stats", response_model=StatsResponse)
 async def stats(session: AsyncSession = Depends(get_session)) -> StatsResponse:
@@ -79,7 +83,7 @@ async def query(
     session: AsyncSession = Depends(get_session),
 ) -> QueryResponse:
     await consume_public_query_quota()
-    service = QueryService(session, app_name=None)
+    service = QueryService(session, app_name=list(PUBLIC_QUERY_NAMESPACES))
     return await service.query(request)
 
 
