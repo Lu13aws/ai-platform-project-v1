@@ -1,5 +1,5 @@
-import asyncio
 
+from aiplatform.loop import run_preserving_loop
 from aiplatform.smoke import handle_smoke_test
 from apps.rag_demo.main import app
 from mangum import Mangum
@@ -75,15 +75,6 @@ async def _list_documents(app_name: str) -> list[dict]:
         await engine.dispose()
 
 
-def _run(coro):
-    """asyncio.run() closes the loop; Mangum needs a current one again when the same warm
-    container serves the next HTTP request, otherwise every request returns 500."""
-    try:
-        return asyncio.run(coro)
-    finally:
-        asyncio.set_event_loop(asyncio.new_event_loop())
-
-
 def handler(event, context):
     smoke = handle_smoke_test(event, "rag-demo")
     if smoke is not None:
@@ -91,14 +82,14 @@ def handler(event, context):
     # Direct-invoke actions: API Gateway events never carry a top-level "action" key,
     # so these are reachable only with lambda:InvokeFunction, not over HTTP.
     if event.get("action") == "run_migrations":
-        applied = _run(_run_migrations())
+        applied = run_preserving_loop(_run_migrations())
         return {"status": "ok", "applied": applied}
     if event.get("action") == "integrity_check":
-        return {"status": "ok", **_run(_integrity_check())}
+        return {"status": "ok", **run_preserving_loop(_integrity_check())}
     if event.get("action") == "list_documents":
         app_name = event.get("app_name")
         if not isinstance(app_name, str) or not app_name:
             return {"status": "error", "error": "list_documents needs a non-empty app_name"}
-        documents = _run(_list_documents(app_name))
+        documents = run_preserving_loop(_list_documents(app_name))
         return {"status": "ok", "app_name": app_name, "count": len(documents), "documents": documents}
     return _mangum(event, context)

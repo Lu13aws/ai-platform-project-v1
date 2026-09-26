@@ -6,11 +6,12 @@ EventBridge events carry no top-level "action" key, so this is reachable only wi
 lambda:InvokeFunction. It never reads or writes application data.
 """
 
-import asyncio
 from collections.abc import Callable
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine
+
+from aiplatform.loop import run_preserving_loop
 
 
 def _public_engine() -> AsyncEngine:
@@ -38,10 +39,8 @@ def handle_smoke_test(
 
     result = {"function": function_name, "app_env": settings.app_env}
     try:
-        asyncio.run(_ping(get_engine()))
+        run_preserving_loop(_ping(get_engine()))
         outcome = {"status": "ok", **result, "database": "ok"}
     except Exception as exc:
         outcome = {"status": "error", **result, "database": f"{type(exc).__name__}: {str(exc)[:200]}"}
-    # Mangum-based handlers need a current event loop again after asyncio.run() closed it.
-    asyncio.set_event_loop(asyncio.new_event_loop())
     return outcome

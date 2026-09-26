@@ -182,3 +182,57 @@ def test_list_documents_action_requires_an_app_name(lambda_handler, monkeypatch)
 
     assert result["status"] == "error"
     listing.assert_not_called()
+
+
+def test_direct_invoke_action_keeps_the_very_same_event_loop(lambda_handler, monkeypatch):
+    """Mangum keeps one loop across warm invocations and the shared DB pool is bound to it: a
+    different loop after an action breaks the next DB request even though *a* loop exists."""
+    loop_before = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop_before)
+    monkeypatch.setattr(lambda_handler, "_integrity_check", AsyncMock(return_value={"totals": {}, "per_app": []}))
+    try:
+        lambda_handler.handler({"action": "integrity_check"}, None)
+
+        assert asyncio.get_event_loop_policy().get_event_loop() is loop_before
+    finally:
+        loop_before.close()
+
+
+def test_a_loop_bound_resource_survives_an_action_between_two_http_requests(lambda_handler, monkeypatch):
+    """Stand-in for the pooled DB connection: created on the loop of request 1, must still be
+    usable on request 2 after a direct-invoke action ran in between (this returned 500)."""
+    from mangum import Mangum
+
+    app = FastAPI()
+    bound = {}
+
+    @app.get("/db")
+    async def db() -> dict:
+        loop = asyncio.get_running_loop()
+        bound.setdefault("loop", loop)
+        assert bound["loop"] is loop, "resource created on another event loop"
+        return {"status": "ok"}
+
+    monkeypatch.setattr(lambda_handler, "_mangum", Mangum(app, lifespan="off"))
+    monkeypatch.setattr(lambda_handler, "_integrity_check", AsyncMock(return_value={"totals": {}, "per_app": []}))
+    event = {
+        "version": "2.0",
+        "routeKey": "GET /db",
+        "rawPath": "/db",
+        "rawQueryString": "",
+        "headers": {"host": "example.test"},
+        "requestContext": {
+            "http": {"method": "GET", "path": "/db", "protocol": "HTTP/1.1", "sourceIp": "127.0.0.1"},
+            "stage": "$default",
+        },
+        "isBase64Encoded": False,
+    }
+
+    loop = asyncio.new_event_loop()  # what Mangum keeps between warm invocations
+    asyncio.set_event_loop(loop)
+    try:
+        assert lambda_handler.handler(event, None)["statusCode"] == 200
+        lambda_handler.handler({"action": "integrity_check"}, None)
+        assert lambda_handler.handler(event, None)["statusCode"] == 200
+    finally:
+        loop.close()
