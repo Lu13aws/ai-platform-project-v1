@@ -25,7 +25,7 @@ import time
 from pathlib import Path
 
 import boto3
-
+from _secrets import ensure_secret_merged, grant_secret_read
 from aiplatform.settings import settings
 
 ACCOUNT_ID = "759302162548"
@@ -36,6 +36,11 @@ ECR_IMAGE = f"{ACCOUNT_ID}.dkr.ecr.{REGION}.amazonaws.com/ai-platform-rag-demo:l
 HANDLER_CMD = ["apps.regulatory_pipeline.lambda_handler.handler"]
 
 ROLE_NAME = "ai-platform-lambda-role"          # shared with Phase 1 + Phase 2
+
+# Shared across all non-corp Lambdas — see scripts/_secrets.py and
+# aiplatform/secrets.py (which reads this same secret at cold start).
+APP_SECRET_NAME = "ai-platform/app-secrets"
+APP_SECRET_POLICY_NAME = "AppSecretsAccess"
 
 EVENTBRIDGE_RULE_NAME = "ai-platform-regulatory-monthly"
 EVENTBRIDGE_SCHEDULE = "cron(0 7 1 * ? *)"     # 1st of month, 07:00 UTC
@@ -88,9 +93,6 @@ def get_role_arn(iam) -> str:
 def build_env_vars() -> dict[str, str]:
     return {
         "APP_ENV": "production",
-        "DATABASE_URL": settings.database_url,
-        "OPENAI_API_KEY": settings.openai_api_key.get_secret_value(),
-        "ANTHROPIC_API_KEY": settings.anthropic_api_key.get_secret_value(),
         "LLM_PROVIDER": settings.llm_provider,
         "OPENAI_CHAT_MODEL": settings.openai_chat_model,
         "OPENAI_EMBEDDING_MODEL": settings.openai_embedding_model,
@@ -99,6 +101,19 @@ def build_env_vars() -> dict[str, str]:
         "MAX_LLM_CALLS_PER_RUN": str(settings.max_llm_calls_per_run),
         "SNS_TOPIC_ARN": load_sns_config(),
     }
+
+
+def sync_app_secret(sm, iam) -> None:
+    secret_arn = ensure_secret_merged(
+        sm,
+        APP_SECRET_NAME,
+        {
+            "DATABASE_URL": settings.database_url,
+            "OPENAI_API_KEY": settings.openai_api_key.get_secret_value(),
+            "ANTHROPIC_API_KEY": settings.anthropic_api_key.get_secret_value(),
+        },
+    )
+    grant_secret_read(iam, ROLE_NAME, APP_SECRET_POLICY_NAME, secret_arn)
 
 
 def deploy_lambda(lmb, role_arn: str, env_vars: dict[str, str], vpc: dict | None) -> str:
@@ -169,6 +184,7 @@ def main() -> None:
     iam = boto3.client("iam", region_name=REGION)
     lmb = boto3.client("lambda", region_name=REGION)
     events = boto3.client("events", region_name=REGION)
+    sm = boto3.client("secretsmanager", region_name=REGION)
 
     print("\n=== Step 0: VPC config ===")
     vpc = load_vpc_config()
@@ -181,6 +197,9 @@ def main() -> None:
     except Exception as exc:
         print(f"  [error] {type(exc).__name__}: {exc}", file=sys.stderr)
         sys.exit(1)
+
+    print("\n=== Step 1b: App secret (Secrets Manager) ===")
+    sync_app_secret(sm, iam)
 
     print("\n=== Step 2: Lambda function ===")
     env_vars = build_env_vars()

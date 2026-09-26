@@ -10,10 +10,10 @@ exercised in production.
 """
 
 import pytest
+from aiplatform.auth.cognito import get_current_user, require_admin
+from aiplatform.settings import settings
 from fastapi import HTTPException
 from starlette.requests import Request
-
-from aiplatform.auth.cognito import get_current_user, require_admin
 
 
 def _request(aws_event: dict | None = None) -> Request:
@@ -79,6 +79,14 @@ async def test_get_current_user_local_dev_bypass(monkeypatch):
 
     assert user.user_id == "dev-user-local"
     assert user.groups == ["admin"]
+
+
+async def test_get_current_user_refuses_bypass_in_production(monkeypatch):
+    monkeypatch.setenv("AUTH_BYPASS", "true")
+    monkeypatch.setattr(settings, "app_env", "production")
+
+    with pytest.raises(RuntimeError, match="refusing to bypass"):
+        await get_current_user(_request())
 
 
 async def test_require_admin_rejects_non_admin_user():

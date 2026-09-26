@@ -9,11 +9,23 @@ Usage:
     print(settings.database_url)
 """
 
+import os
 from functools import lru_cache
 from typing import Literal
 
 from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from aiplatform.secrets import load_json_secret_into_env
+
+# Populates DATABASE_URL/OPENAI_API_KEY/etc. from Secrets Manager before
+# Settings() reads the environment below — no-op outside Lambda. corp_api's
+# deploy sets APP_SECRETS_NAME to its own corp-scoped secret (see
+# aiplatform/storage/corp_db.py); everything else uses the shared default.
+load_json_secret_into_env(os.environ.get("APP_SECRETS_NAME", "ai-platform/app-secrets"))
+
+_DEFAULT_DATABASE_URL = "postgresql+asyncpg://aiplatform:aiplatform@localhost:5432/aiplatform"
+_DEFAULT_ALEMBIC_DATABASE_URL = "postgresql://aiplatform:aiplatform@localhost:5432/aiplatform"
 
 
 class Settings(BaseSettings):
@@ -41,10 +53,10 @@ class Settings(BaseSettings):
     # ── Database ──────────────────────────────────────────────────────────────
 
     database_url: str = Field(
-        default="postgresql+asyncpg://aiplatform:aiplatform@localhost:5432/aiplatform",
+        default=_DEFAULT_DATABASE_URL,
     )
     alembic_database_url: str = Field(
-        default="postgresql://aiplatform:aiplatform@localhost:5432/aiplatform",
+        default=_DEFAULT_ALEMBIC_DATABASE_URL,
     )
     db_pool_size: int = 10
     db_max_overflow: int = 20
@@ -58,6 +70,15 @@ class Settings(BaseSettings):
                 "DATABASE_URL must use the asyncpg driver: postgresql+asyncpg://..."
             )
         return v
+
+    @model_validator(mode="after")
+    def validate_no_default_credentials_in_production(self) -> "Settings":
+        if self.is_production and self.database_url == _DEFAULT_DATABASE_URL:
+            raise ValueError(
+                "DATABASE_URL is still the local-dev default (aiplatform:aiplatform) "
+                "in production - set a real DATABASE_URL."
+            )
+        return self
 
     # ── LLM — Provider Selection ──────────────────────────────────────────────
 

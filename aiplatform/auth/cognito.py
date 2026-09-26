@@ -27,6 +27,8 @@ from dataclasses import dataclass, field
 
 from fastapi import Depends, HTTPException, Request, status
 
+from aiplatform.settings import settings
+
 
 @dataclass
 class UserClaims:
@@ -73,8 +75,14 @@ async def get_current_user(request: Request) -> UserClaims:
                 groups=_parse_groups(claims.get("cognito:groups")),
             )
 
-    # Local development bypass
+    # Local development bypass — fails closed in production instead of
+    # silently honoring a misconfigured env var on the one stack that holds
+    # private corporate documents and audit logs.
     if os.environ.get("AUTH_BYPASS", "").lower() == "true":
+        if settings.is_production:
+            raise RuntimeError(
+                "AUTH_BYPASS=true is set but APP_ENV=production — refusing to bypass auth."
+            )
         return UserClaims(
             user_id="dev-user-local",
             email="dev@local",

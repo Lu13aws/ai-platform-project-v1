@@ -28,7 +28,7 @@ import sys
 from pathlib import Path
 
 import boto3
-
+from _secrets import ensure_secret_merged, grant_secret_read
 from aiplatform.settings import settings
 
 ACCOUNT_ID = "759302162548"
@@ -40,6 +40,11 @@ HANDLER_CMD = ["apps.content_creator.lambda_handler.handler"]
 
 ROLE_NAME = "ai-platform-lambda-role"
 SECRET_NAME = "linkedin/credentials"
+
+# Shared across all non-corp Lambdas — see scripts/_secrets.py and
+# aiplatform/secrets.py (which reads this same secret at cold start).
+APP_SECRET_NAME = "ai-platform/app-secrets"
+APP_SECRET_POLICY_NAME = "AppSecretsAccess"
 
 EVENTBRIDGE_RULE_NAME = "ai-platform-content-weekly"
 EVENTBRIDGE_SCHEDULE = "cron(30 8 ? * TUE *)"  # Tuesday 08:30 UTC
@@ -119,12 +124,22 @@ def attach_secrets_policy(iam, role_arn: str) -> None:
         print(f"  [warn] Could not attach Secrets Manager policy: {exc}")
 
 
+def sync_app_secret(sm, iam) -> None:
+    secret_arn = ensure_secret_merged(
+        sm,
+        APP_SECRET_NAME,
+        {
+            "DATABASE_URL": settings.database_url,
+            "OPENAI_API_KEY": settings.openai_api_key.get_secret_value(),
+            "ANTHROPIC_API_KEY": settings.anthropic_api_key.get_secret_value(),
+        },
+    )
+    grant_secret_read(iam, ROLE_NAME, APP_SECRET_POLICY_NAME, secret_arn)
+
+
 def build_env_vars() -> dict[str, str]:
     env = {
         "APP_ENV": "production",
-        "DATABASE_URL": settings.database_url,
-        "OPENAI_API_KEY": settings.openai_api_key.get_secret_value(),
-        "ANTHROPIC_API_KEY": settings.anthropic_api_key.get_secret_value(),
         "LLM_PROVIDER": settings.llm_provider,
         "OPENAI_CHAT_MODEL": settings.openai_chat_model,
         "OPENAI_EMBEDDING_MODEL": settings.openai_embedding_model,
@@ -210,6 +225,7 @@ def main() -> None:
     iam = boto3.client("iam", region_name=REGION)
     lmb = boto3.client("lambda", region_name=REGION)
     events = boto3.client("events", region_name=REGION)
+    sm = boto3.client("secretsmanager", region_name=REGION)
 
     print("\n=== Step 0: VPC config ===")
     vpc = load_vpc_config()
@@ -217,6 +233,7 @@ def main() -> None:
     print("\n=== Step 1: IAM role (shared) ===")
     role_arn = get_role_arn(iam)
     attach_secrets_policy(iam, role_arn)
+    sync_app_secret(sm, iam)
 
     print("\n=== Step 2: Lambda function ===")
     env_vars = build_env_vars()

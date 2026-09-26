@@ -44,3 +44,30 @@ def test_get_settings_is_cached():
     s1 = get_settings()
     s2 = get_settings()
     assert s1 is s2
+
+
+def test_default_database_url_rejected_in_production():
+    with pytest.raises(ValueError, match="local-dev default"):
+        Settings(
+            _env_file=None,  # type: ignore[call-arg]
+            app_env="production",
+            openai_api_key="sk-test",
+        )
+
+
+def test_default_database_url_allowed_outside_production():
+    s = Settings(
+        _env_file=None,  # type: ignore[call-arg]
+        app_env="development",
+    )
+    assert s.database_url.startswith("postgresql+asyncpg://aiplatform:aiplatform@")
+
+
+def test_real_database_url_allowed_in_production():
+    s = Settings(
+        _env_file=None,  # type: ignore[call-arg]
+        app_env="production",
+        openai_api_key="sk-test",
+        database_url="postgresql+asyncpg://real_user:real_pass@prod-host:5432/aiplatform",
+    )
+    assert s.is_production is True

@@ -17,10 +17,32 @@ from contextlib import asynccontextmanager
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-_CORP_DATABASE_URL = os.environ.get(
-    "CORP_DATABASE_URL",
-    "postgresql+asyncpg://aiplatform:aiplatform@localhost:5432/aiplatform_corp",
-)
+from aiplatform.secrets import load_json_secret_into_env
+
+# Corp-only secret, separate from the shared ai-platform/app-secrets used by
+# every other Lambda — see scripts/deploy_corp_api.py and the dormant
+# CorpSecretsAccess IAM policy it grants (now actually consumed via this
+# secret name matching the policy's arn:...:secret:ai-platform/corp-*
+# resource pattern).
+load_json_secret_into_env("ai-platform/corp-app-secrets")
+
+_DEFAULT_CORP_DATABASE_URL = "postgresql+asyncpg://aiplatform:aiplatform@localhost:5432/aiplatform_corp"
+
+_CORP_DATABASE_URL = os.environ.get("CORP_DATABASE_URL", _DEFAULT_CORP_DATABASE_URL)
+
+# Reads APP_ENV directly instead of importing aiplatform.settings.settings:
+# this module intentionally bypasses settings.py entirely (see module
+# docstring), and importing the shared Settings object here would force its
+# full construction/validation (including the unrelated public DATABASE_URL
+# field) just to read one flag — a real failure mode, not hypothetical: it
+# broke corp_api's cold start in production before this fix.
+if os.environ.get("APP_ENV", "development") == "production" and (
+    _CORP_DATABASE_URL == _DEFAULT_CORP_DATABASE_URL
+):
+    raise RuntimeError(
+        "CORP_DATABASE_URL is still the local-dev default (aiplatform:aiplatform) "
+        "in production - set a real CORP_DATABASE_URL."
+    )
 
 corp_engine = create_async_engine(
     _CORP_DATABASE_URL,

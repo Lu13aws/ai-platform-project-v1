@@ -19,6 +19,7 @@ import sys
 import time
 
 import boto3
+from _secrets import ensure_secret_merged
 
 ACCOUNT_ID = "759302162548"
 REGION = "eu-central-1"
@@ -26,6 +27,13 @@ FUNCTION_NAME = "ai-platform-corp-api"
 HANDLER = "apps.corp_api.lambda_handler.handler"
 ROLE_NAME = "ai-platform-corp-lambda-role"
 API_NAME = "ai-platform-corp-api"
+
+# Corp-only secret — covered by the CorpSecretsAccess IAM policy's
+# ai-platform/corp-* wildcard (see create_or_get_role below), so this needs
+# no new IAM grant, only the write. aiplatform/storage/corp_db.py and
+# aiplatform/settings.py (via APP_SECRETS_NAME below) read it back at
+# Lambda cold start — see aiplatform/secrets.py.
+CORP_APP_SECRET_NAME = "ai-platform/corp-app-secrets"
 
 # Same ECR image as all other Lambdas
 ECR_REPO = f"{ACCOUNT_ID}.dkr.ecr.{REGION}.amazonaws.com/ai-platform-rag-demo"
@@ -98,23 +106,40 @@ def create_or_get_role(iam) -> str:
     return role_arn
 
 
-def build_env_vars() -> dict[str, str]:
+def sync_corp_secret(sm) -> None:
     corp_db_url = os.environ.get("CORP_DATABASE_URL")
     if not corp_db_url:
-        print("ERROR: CORP_DATABASE_URL not set. Load it from Secrets Manager first:")
-        print("  aws secretsmanager get-secret-value --secret-id ai-platform/corp-db-credentials")
+        print("ERROR: CORP_DATABASE_URL not set locally. Set it before running this script.")
         sys.exit(1)
 
+    # corp_api never reads settings.database_url (it uses CORP_DATABASE_URL
+    # via aiplatform.storage.corp_db exclusively) — but importing
+    # aiplatform.settings anywhere in this Lambda (e.g. aiplatform.auth.cognito,
+    # aiplatform.llm) still constructs the shared Settings object, and its
+    # production validator rejects a still-default database_url. Reuse
+    # CORP_DATABASE_URL as a syntactically-valid, never-actually-used value
+    # for that unrelated field rather than weakening the validator for every
+    # other Lambda that does depend on it.
+    updates = {"CORP_DATABASE_URL": corp_db_url, "DATABASE_URL": corp_db_url}
     openai_key = os.environ.get("OPENAI_API_KEY", "")
     anthropic_key = os.environ.get("ANTHROPIC_API_KEY", "")
+    if openai_key:
+        updates["OPENAI_API_KEY"] = openai_key
+    if anthropic_key:
+        updates["ANTHROPIC_API_KEY"] = anthropic_key
     if not openai_key and not anthropic_key:
-        print("WARNING: No LLM API key set (OPENAI_API_KEY or ANTHROPIC_API_KEY)")
+        print(
+            "WARNING: No LLM API key set locally (OPENAI_API_KEY or ANTHROPIC_API_KEY) "
+            "— leaving any existing value in the secret untouched"
+        )
 
+    ensure_secret_merged(sm, CORP_APP_SECRET_NAME, updates)
+
+
+def build_env_vars() -> dict[str, str]:
     return {
         "APP_ENV": "production",
-        "CORP_DATABASE_URL": corp_db_url,
-        "OPENAI_API_KEY": openai_key,
-        "ANTHROPIC_API_KEY": anthropic_key,
+        "APP_SECRETS_NAME": CORP_APP_SECRET_NAME,
         "LLM_PROVIDER": os.environ.get("LLM_PROVIDER", "openai"),
         "COGNITO_USER_POOL_ID": COGNITO_USER_POOL_ID,
         "COGNITO_CLIENT_ID": COGNITO_CLIENT_ID,
@@ -292,12 +317,14 @@ def main() -> None:
     lambda_client = boto3.client("lambda", region_name=REGION)
     ecr = boto3.client("ecr", region_name=REGION)
     apigw = boto3.client("apigatewayv2", region_name=REGION)
+    sm = boto3.client("secretsmanager", region_name=REGION)
 
     print(f"Phase 6 — Deploy {FUNCTION_NAME}")
     print("=" * 50)
 
     image_uri = get_ecr_image_uri(ecr)
     role_arn = create_or_get_role(iam)
+    sync_corp_secret(sm)
     fn_arn = create_or_update_lambda(lambda_client, role_arn, image_uri)
     api_id, endpoint = create_or_get_api(apigw, fn_arn)
     auth_id = create_or_get_authorizer(apigw, api_id)
