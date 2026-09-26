@@ -12,9 +12,9 @@ type Message =
   | { role: 'assistant'; response: QueryResponse }
 
 const SUGGESTED = [
-  'What applications does this AI platform support?',
+  'What does the Regulatory Radar monitor?',
   'Summarize the latest competitor signals',
-  'What cybersecurity risks does FINMA identify for 2025?',
+  'How does this platform avoid re-embedding unchanged documents?',
   'What are the layers of this AI platform?',
   'What is the MVP roadmap for this platform?',
 ]
