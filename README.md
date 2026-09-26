@@ -1,5 +1,11 @@
 # AI Knowledge Platform
 
+[![Tests](https://github.com/Lu13aws/ai-platform-project-v1/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/Lu13aws/ai-platform-project-v1/actions/workflows/tests.yml)
+
+> **Personal portfolio project.** Built and operated by one person on a personal AWS account as a hands-on reference for AI and data engineering. The compliance documents in [`/compliance`](compliance/) (NIST AI RMF, GDPR/DSG and AWS Well-Architected mappings, including coverage percentages) are **self-assessments**, not audits or certifications. Resource identifiers such as `<AWS_ACCOUNT_ID>` or `<API_ID>` are placeholders; replace them with your own values (see `.env.example`).
+>
+> **In 60 seconds:** scheduled Lambda agents collect public signals for three radars (technology, competitors, regulation), classify them with an LLM, store them in PostgreSQL + pgvector and answer questions with cited sources (single-pass RAG). A corporate prototype adds Cognito-based RBAC and an audit log. The public demo caps AI questions at 150 per day to keep costs bounded. Live: [platform.bridging-data.com](https://platform.bridging-data.com).
+
 ## Project Description
 
 Modular AI knowledge platform built on AWS using PostgreSQL + pgvector, FastAPI, and OpenAI / Anthropic LLMs.
@@ -88,20 +94,27 @@ ai-platform-project-v1/
 
 ### Diagramms Phase 1 - Public RAG Demo
 
-https://miro.com/app/board/uXjVHErgZ40=/?moveToWidget=3458764675722816283&cot=14
-https://miro.com/app/board/uXjVHErgZ40=/?moveToWidget=3458764675724444499&cot=14
+![Phase 1 - Public RAG demo](docs/phase1-public-rag.jpg)
+
+Interactive board: https://miro.com/app/board/uXjVHErgZ40=/?moveToWidget=3458764675722816283&cot=14 · https://miro.com/app/board/uXjVHErgZ40=/?moveToWidget=3458764675724444499&cot=14
 
 ### Diagramms Phase 2 - Technology Radar
 
-https://miro.com/app/board/uXjVHErgZ40=/?moveToWidget=3458764676069211957&cot=14
+![Phase 2 - deployment architecture](docs/phase2-deployment-architecture.jpg)
+
+Interactive board: https://miro.com/app/board/uXjVHErgZ40=/?moveToWidget=3458764676069211957&cot=14
 
 ### Diagramms Phase 3 - Private Knowledge Hub
 
-https://miro.com/app/board/uXjVHErgZ40=/?moveToWidget=3458764675971998867&cot=14
+![Phase 3 - private knowledge hub](docs/phase3-knowledge-hub.jpg)
+
+Interactive board: https://miro.com/app/board/uXjVHErgZ40=/?moveToWidget=3458764675971998867&cot=14
 
 ### Diagramms Phase 6 - Corporate LLM AI Knowledge Platform
 
-https://miro.com/app/board/uXjVHErgZ40=/?moveToWidget=3458764676201009164&cot=14
+![Phase 6 - corporate LLM prototype](docs/phase6-llm-prototype.jpg)
+
+Interactive board: https://miro.com/app/board/uXjVHErgZ40=/?moveToWidget=3458764676201009164&cot=14
 
 ```
 Client (bridging-data.com / CLI)
@@ -180,9 +193,9 @@ The `docker/postgres/init.sql` script enables the `vector` and `uuid-ossp` exten
 - Engine: PostgreSQL 16 with `pgvector` extension
 - Instance: `db.t3.micro`, eu-central-1, free tier
 - Identifier: `ai-platform-db-v2`
-- Endpoint: `ai-platform-db-v2.cvs0uioe8sum.eu-central-1.rds.amazonaws.com:5432`
+- Endpoint: `<RDS_ENDPOINT>:5432`
 - VPC: `ai-platform-vpc` (private subnets — no public endpoint)
-- Security group: `sg-0ca46655eabaee9e7` — port 5432 from Lambda SG + developer IP only
+- Security group: `<SECURITY_GROUP_ID>` — port 5432 from the Lambda security group only
 - Enable extensions on fresh RDS: `uv run python scripts/enable_extensions.py`
 - Run migrations against RDS: `uv run alembic upgrade head`
 
@@ -198,7 +211,7 @@ The `docker/postgres/init.sql` script enables the `vector` and `uuid-ossp` exten
 
 ### AWS Lambda + API Gateway (live)
 
-- **Public API:** `https://72w6p1rx38.execute-api.eu-central-1.amazonaws.com`
+- **Public API:** `https://<API_ID>.execute-api.eu-central-1.amazonaws.com`
   - Health: `GET /health`
   - Docs: `GET /docs`
   - Query: `POST /api/v1/query`
@@ -207,7 +220,7 @@ The `docker/postgres/init.sql` script enables the `vector` and `uuid-ossp` exten
   - Latest radar report: `GET /api/v1/radar/report/latest`
   - CORS: `https://bridging-data.com`, `https://platform.bridging-data.com`
 
-- **Corporate API (Phase 6):** `https://3odo5043uh.execute-api.eu-central-1.amazonaws.com`
+- **Corporate API (Phase 6):** `https://<CORP_API_ID>.execute-api.eu-central-1.amazonaws.com`
   - All routes require `Authorization: Bearer <Cognito JWT>` (ai-platform-corp user pool)
   - Health: `GET /api/v1/corp/health`
   - Auth check: `GET /api/v1/corp/health/auth`
@@ -231,7 +244,7 @@ The `docker/postgres/init.sql` script enables the `vector` and `uuid-ossp` exten
 - Lambda (competitor pipeline): `ai-platform-competitor-pipeline`, 512 MB, 300s timeout, Monday 08:00 UTC
 - Lambda (regulatory pipeline): `ai-platform-regulatory-pipeline`, 512 MB, 300s timeout, 1st of month 07:00 UTC
 - Lambda (cleanup): `ai-platform-cleanup`, 256 MB, 120s timeout, 1st of month 03:00 UTC
-- ECR: `759302162548.dkr.ecr.eu-central-1.amazonaws.com/ai-platform-rag-demo:lambda`
+- ECR: `<AWS_ACCOUNT_ID>.dkr.ecr.eu-central-1.amazonaws.com/ai-platform-rag-demo:lambda`
 
 **Redeploy after code changes (all functions share the same image):**
 
@@ -248,12 +261,12 @@ docker run --rm --entrypoint python ai-platform-rag-demo:lambda -c \
 
 # 3. Push with timestamp tag (avoids ECR dedup of unchanged lambda tag)
 $ts = Get-Date -Format "yyyyMMddHHmm"
-docker tag ai-platform-rag-demo:lambda 759302162548.dkr.ecr.eu-central-1.amazonaws.com/ai-platform-rag-demo:lambda-$ts
-docker push 759302162548.dkr.ecr.eu-central-1.amazonaws.com/ai-platform-rag-demo:lambda-$ts
+docker tag ai-platform-rag-demo:lambda <AWS_ACCOUNT_ID>.dkr.ecr.eu-central-1.amazonaws.com/ai-platform-rag-demo:lambda-$ts
+docker push <AWS_ACCOUNT_ID>.dkr.ecr.eu-central-1.amazonaws.com/ai-platform-rag-demo:lambda-$ts
 
 # 4. Update all Lambda functions with the pinned digest
 $digest = (aws ecr describe-images --repository-name ai-platform-rag-demo --image-ids imageTag=lambda-$ts --query "imageDetails[0].imageDigest" --output text)
-$ecr = "759302162548.dkr.ecr.eu-central-1.amazonaws.com/ai-platform-rag-demo@$digest"
+$ecr = "<AWS_ACCOUNT_ID>.dkr.ecr.eu-central-1.amazonaws.com/ai-platform-rag-demo@$digest"
 aws lambda update-function-code --function-name ai-platform-rag-demo             --image-uri $ecr --region eu-central-1
 aws lambda update-function-code --function-name ai-platform-radar-pipeline        --image-uri $ecr --region eu-central-1
 aws lambda update-function-code --function-name ai-platform-competitor-pipeline   --image-uri $ecr --region eu-central-1
@@ -261,8 +274,8 @@ aws lambda update-function-code --function-name ai-platform-regulatory-pipeline 
 aws lambda update-function-code --function-name ai-platform-cleanup               --image-uri $ecr --region eu-central-1
 
 # 5. Update the lambda tag to point to the new image
-docker tag ai-platform-rag-demo:lambda 759302162548.dkr.ecr.eu-central-1.amazonaws.com/ai-platform-rag-demo:lambda
-docker push 759302162548.dkr.ecr.eu-central-1.amazonaws.com/ai-platform-rag-demo:lambda
+docker tag ai-platform-rag-demo:lambda <AWS_ACCOUNT_ID>.dkr.ecr.eu-central-1.amazonaws.com/ai-platform-rag-demo:lambda
+docker push <AWS_ACCOUNT_ID>.dkr.ecr.eu-central-1.amazonaws.com/ai-platform-rag-demo:lambda
 
 uv run python scripts/deploy_lambda.py            # updates RAG demo env vars / config
 ```
@@ -688,8 +701,8 @@ Both use the same ECR image (`ai-platform-rag-demo:lambda`) with different `Imag
 **Redeploy after code changes:**
 ```bash
 docker build -f Dockerfile.lambda -t ai-platform-rag-demo:lambda .
-docker tag ai-platform-rag-demo:lambda 759302162548.dkr.ecr.eu-central-1.amazonaws.com/ai-platform-rag-demo:lambda
-docker push 759302162548.dkr.ecr.eu-central-1.amazonaws.com/ai-platform-rag-demo:lambda
+docker tag ai-platform-rag-demo:lambda <AWS_ACCOUNT_ID>.dkr.ecr.eu-central-1.amazonaws.com/ai-platform-rag-demo:lambda
+docker push <AWS_ACCOUNT_ID>.dkr.ecr.eu-central-1.amazonaws.com/ai-platform-rag-demo:lambda
 uv run python scripts/deploy_regulatory_pipeline.py
 ```
 
@@ -800,7 +813,7 @@ Then manually re-ingest the EU AI Act, GDPR, and FINMA PDFs using the steps abov
 **Completed:**
 - **Corp RDS** (`ai-platform-db-corp`) — separate PostgreSQL + pgvector instance in `ai-platform-vpc`, no public endpoint. Tables: `documents`, `chunks`, `embeddings`, `audit_logs`
 - **Corp API Lambda** (`ai-platform-corp-api`) — FastAPI + Mangum, same shared ECR image, handler `apps.corp_api.lambda_handler`
-- **Corp API Gateway** (`3odo5043uh`) — HTTP API with Cognito JWT Authorizer (validates against `ai-platform-corp` user pool)
+- **Corp API Gateway** (`<CORP_API_ID>`) — HTTP API with Cognito JWT Authorizer (validates against `ai-platform-corp` user pool)
 - **RBAC** — `admin` group (ingest + query + audit + delete), `demo_user` group (query only); groups parsed from API Gateway JWT claims (bracket-stripping fix for `"[admin]"` serialization)
 - **Ingest endpoint** (`POST /corp/ingest`) — SHA-256 dedup, Chunker → TextChunk objects → OpenAI embeddings → Corp RDS
 - **Query endpoint** (`POST /corp/query`) — pgvector similarity search on Corp RDS → OpenAI LLM → grounded answer with sources
@@ -967,7 +980,7 @@ uv run uvicorn apps.private_hub.main:app --reload --port 8001 --host 127.0.0.1
 **Completed:**
 - RDS instance `ai-platform-db-v2` (PostgreSQL 16, db.t3.micro) moved from default VPC to `ai-platform-vpc`
 - Private subnets only — `PubliclyAccessible: false`
-- New RDS security group `sg-0ca46655eabaee9e7` in `ai-platform-vpc`:
+- New RDS security group `<SECURITY_GROUP_ID>` in `ai-platform-vpc`:
   allows port 5432 from Lambda SG + developer home IP only
 - All 5 Lambda functions updated with new DATABASE_URL
 - Old instance `ai-platform-db` (default VPC) deleted

@@ -24,13 +24,14 @@ The platform must be modular, reusable, cost-aware, and cloud-native. All applic
 
 | Component | Status |
 |---|---|
-| Public RAG Demo API | ✅ Live — `https://72w6p1rx38.execute-api.eu-central-1.amazonaws.com` |
+| Public RAG Demo API | ✅ Live — `https://<API_ID>.execute-api.eu-central-1.amazonaws.com` |
 | Technology Radar Pipeline | ✅ Live — weekly Lambda (Monday 06:00 UTC) |
 | Regulatory Radar Pipeline | ✅ Live — monthly Lambda (1st of month 07:00 UTC) |
 | Competitor Radar Pipeline | ✅ Live — weekly Lambda (Monday 08:00 UTC) |
+| Token Price Radar Pipeline | ✅ Live — weekly Lambda (Monday 07:00 UTC) |
 | Knowledge Platform (Agent Center, AI Chat, Skills Hub) | ✅ Live — same Lambda as RAG Demo |
 | Content Creator Pipeline | ✅ Live — weekly Lambda (Tuesday 08:30 UTC) |
-| Corporate LLM API | ✅ Live — `https://3odo5043uh.execute-api.eu-central-1.amazonaws.com` |
+| Corporate LLM API | ✅ Live — `https://<CORP_API_ID>.execute-api.eu-central-1.amazonaws.com` |
 | Cleanup Pipeline | ✅ Live — monthly Lambda (1st of month 03:00 UTC) |
 | RDS PostgreSQL + pgvector (public) | ✅ Live — private VPC (`ai-platform-vpc`), `ai-platform-db-v2` |
 | RDS PostgreSQL + pgvector (corporate) | ✅ Live — private VPC (`ai-platform-vpc`), `ai-platform-db-corp` |
@@ -49,9 +50,12 @@ The platform must be modular, reusable, cost-aware, and cloud-native. All applic
 | CompetitorCollectorAgent | Blog, pricing, financial, community signal collection |
 | CompetitorAnalyzerAgent | LLM signal classification by type/sentiment/impact |
 | CompetitorReporterAgent | Competitor report generation |
+| CompetitorNotifierAgent | SNS notifications for the competitor pipeline |
 | RegulatoryCollectorAgent | SHA-256 change detection on regulatory documents |
 | RegulatoryAnalyzerAgent | Diff-based LLM impact classification |
 | RegulatoryReporterAgent | Regulatory change report generation |
+| RegulatoryNotifierAgent | SNS notifications for the regulatory pipeline |
+| TokenPriceReporterAgent | LLM token price report from LiteLLM Git history (Token Price Radar) |
 | ReportIndexerAgent | Auto-indexes S3 reports into vector store after each pipeline run |
 | ContentCreatorAgent | LLM-generated LinkedIn posts from platform signals |
 | LinkedInPublisherAgent | LinkedIn API publisher — posts drafts for human review via LinkedIn Review UI |
@@ -224,7 +228,8 @@ Agents should be modular, reusable, and auditable.
 **Deployed agents (Phase 1–6):** CollectorAgent, AnalyzerAgent, ChangeDetectionAgent,
 ReporterAgent, NotifierAgent, CleanupAgent, CompetitorCollectorAgent, CompetitorAnalyzerAgent,
 CompetitorReporterAgent, RegulatoryCollectorAgent, RegulatoryAnalyzerAgent,
-RegulatoryReporterAgent, ReportIndexerAgent, ContentCreatorAgent, LinkedInPublisherAgent
+RegulatoryReporterAgent, ReportIndexerAgent, ContentCreatorAgent, LinkedInPublisherAgent,
+CompetitorNotifierAgent, RegulatoryNotifierAgent, TokenPriceReporterAgent
 
 **Planned agents (Phase 7, earliest Dec 2026 — requires 6 months of signal history):**
 * SynthesisAgent — cross-domain trend detection across Radar + Competitor + Regulatory signals
@@ -644,7 +649,7 @@ Redshift is a data warehouse for analytical workloads. The MVP requires PostgreS
 
 ### ✅ Phase 1: Public RAG Demo — COMPLETE
 
-Live at `https://72w6p1rx38.execute-api.eu-central-1.amazonaws.com`
+Live at `https://<API_ID>.execute-api.eu-central-1.amazonaws.com`
 
 * Document ingestion (18 formats), chunking, embeddings, pgvector HNSW storage
 * Semantic retrieval + grounded LLM answers with source references
@@ -727,7 +732,7 @@ Infrastructure delivered (separate from public shared stack):
 * `DELETE /corp/documents/{id}` — GDPR Art. 17 on-request deletion, cascade + audit-logged
 * `require_admin` RBAC — `corp-admins` Cognito group enforced on all data endpoints
 
-Endpoints live at: `https://3odo5043uh.execute-api.eu-central-1.amazonaws.com`
+Endpoints live at: `https://<CORP_API_ID>.execute-api.eu-central-1.amazonaws.com`
 
 Future agents (after 6+ months of signal history):
 * Synthesis Agent (trend analysis + recommendations)
@@ -766,7 +771,7 @@ The platform should evolve from a simple RAG demo into a reusable AI knowledge a
 6. ✅ The answer includes source references.
 7. ✅ The system avoids unnecessary reprocessing (SHA-256 dedup + content-hash dedup).
 8. ✅ Raw and temporary data have retention rules (CleanupAgent, monthly Lambda).
-9. ✅ Monthly operating cost remains controlled (~$5–10/month on AWS free tier + spot usage).
+9. ✅ Monthly operating cost is known and monitored: ~USD 75/month as of Sept 2026 (fixed costs dominate: NAT gateway ~30, two RDS instances ~29, VPC public IPv4 ~6, ECR/Secrets Manager/Route 53 ~5; LLM usage is billed separately by OpenAI). The earlier ~USD 5–10 estimate assumed the free tier. AWS Budget: 50 USD/month with alerts at 85 % and 100 %.
 
 ### ✅ Phase 6 Success Criteria — ALL MET
 
