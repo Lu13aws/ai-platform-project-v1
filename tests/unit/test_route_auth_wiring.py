@@ -59,10 +59,10 @@ def test_rag_demo_query_is_public():
     assert not {"require_admin", "get_current_user"} & _dependency_names(route)
 
 
-def test_knowledge_platform_ingest_skill_requires_authentication():
-    assert "get_current_user" in _dependency_names(
-        _route(kp_router, "POST", "/kp/ingest-skill")
-    )
+def test_knowledge_platform_ingest_skill_requires_admin():
+    """Any token of the self-registration pool is not enough: ingestion writes into the knowledge base
+    the public chat serves (see test_ingest_routes_admin_only.py for the behavioural check)."""
+    assert "require_admin" in _dependency_names(_route(kp_router, "POST", "/kp/ingest-skill"))
 
 
 def test_knowledge_platform_linkedin_routes_require_admin():
@@ -79,5 +79,5 @@ def test_knowledge_platform_linkedin_routes_require_admin():
         )
 
 
-def test_rag_demo_ingest_requires_authentication():
-    assert "get_current_user" in _dependency_names(_route(rag_demo_router, "POST", "/ingest"))
+def test_rag_demo_ingest_requires_admin():
+    assert "require_admin" in _dependency_names(_route(rag_demo_router, "POST", "/ingest"))

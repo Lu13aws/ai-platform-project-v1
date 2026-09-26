@@ -1,6 +1,6 @@
 import uuid
 
-from aiplatform.auth.cognito import get_current_user, require_admin
+from aiplatform.auth.cognito import require_admin
 from aiplatform.quota import consume_public_query_quota
 from aiplatform.storage.database import get_session
 from apps.knowledge_platform.api.schemas import (
@@ -88,7 +88,7 @@ async def query(
 
 
 @router.post(
-    "/ingest-skill", response_model=IngestSkillResponse, dependencies=[Depends(get_current_user)]
+    "/ingest-skill", response_model=IngestSkillResponse, dependencies=[Depends(require_admin)]
 )
 async def ingest_skill_endpoint(
     request: IngestSkillRequest,

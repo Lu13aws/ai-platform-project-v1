@@ -1,4 +1,4 @@
-from aiplatform.auth.cognito import get_current_user
+from aiplatform.auth.cognito import require_admin
 from aiplatform.quota import consume_public_query_quota
 from aiplatform.retrieval.embedder import CostLimitExceeded
 from aiplatform.storage.database import get_session
@@ -16,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 router = APIRouter()
 
 
-@router.post("/ingest", response_model=IngestResponse, dependencies=[Depends(get_current_user)])
+@router.post("/ingest", response_model=IngestResponse, dependencies=[Depends(require_admin)])
 async def ingest_document(
     request: IngestRequest,
     session: AsyncSession = Depends(get_session),
