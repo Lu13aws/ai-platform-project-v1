@@ -28,10 +28,11 @@ import urllib.request
 from pathlib import Path
 
 import boto3
+from _aws import account_id
 from botocore.exceptions import ClientError
 
 REGION = "eu-central-1"
-ACCOUNT_ID = "759302162548"
+ACCOUNT_ID = account_id()
 PROJECT = "ai-platform"
 
 VPC_CIDR = "10.0.0.0/16"

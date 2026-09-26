@@ -2,7 +2,7 @@
 
 **Version:** 1.0  
 **Date:** June 2026  
-**Owner:** Luciano (luciano.10@hotmail.de)  
+**Owner:** Luciano (<OWNER_EMAIL>)  
 **Platform:** AI Knowledge & Intelligence Platform (ai-platform-project-v1)
 
 ---

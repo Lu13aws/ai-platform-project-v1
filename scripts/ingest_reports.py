@@ -19,12 +19,13 @@ from pathlib import Path
 
 import boto3
 import httpx
+from _aws import require_env
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from aiplatform.agents.report_indexer import _CONVERTERS, _fmt_date
 from aiplatform.settings import settings
 
-API_URL = "https://72w6p1rx38.execute-api.eu-central-1.amazonaws.com"
+API_URL = require_env("API_BASE")
 INGEST_ENDPOINT = f"{API_URL}/api/v1/kp/ingest-skill"
 BUCKET = settings.s3_bucket_name
 REGION = settings.aws_region

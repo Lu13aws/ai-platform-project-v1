@@ -79,7 +79,7 @@ If an AI-generated output appears wrong or misleading:
 1. Check the cited sources — verify the underlying documents support the answer
 2. Re-phrase the question — different wording often produces more accurate results
 3. Do not act on the output without independent verification
-4. Report persistent issues to the platform owner (luciano.10@hotmail.de)
+4. Report persistent issues to the platform owner (<OWNER_EMAIL>)
 
 ---
 

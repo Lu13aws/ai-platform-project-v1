@@ -5,7 +5,7 @@ Creates:
   - User Pool: ai-platform-corp-users
   - App Client: ai-platform-corp-client (for frontend)
   - Groups: admin, demo_user
-  - Admin user: luciano.10@hotmail.de
+  - Admin user: CORP_ADMIN_EMAIL from .env
 
 Idempotent — safe to re-run.
 
@@ -15,11 +15,12 @@ Usage:
 
 
 import boto3
+from _aws import require_env
 
 REGION = "eu-central-1"
 POOL_NAME = "ai-platform-corp-users"
 CLIENT_NAME = "ai-platform-corp-client"
-ADMIN_EMAIL = "luciano.10@hotmail.de"
+ADMIN_EMAIL = require_env("CORP_ADMIN_EMAIL")
 
 
 def get_or_create_user_pool(cognito) -> str:

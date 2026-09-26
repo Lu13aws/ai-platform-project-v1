@@ -3,7 +3,7 @@
 Create the SNS topic for radar pipeline notifications and subscribe your email.
 
 Usage:
-    uv run python scripts/setup_sns.py --email luciano.10@hotmail.de
+    uv run python scripts/setup_sns.py --email <OWNER_EMAIL>
 
 Saves the topic ARN to infra/sns_config.json (gitignored).
 Re-running is safe — idempotent.

@@ -34,10 +34,10 @@ def test_database_url_must_use_asyncpg():
 def test_secrets_are_masked():
     s = Settings(
         _env_file=None,  # type: ignore[call-arg]
-        openai_api_key="sk-real-key",
+        openai_api_key="sk-test-openai",
     )
-    assert "sk-real-key" not in repr(s)
-    assert s.openai_api_key.get_secret_value() == "sk-real-key"
+    assert "sk-test-openai" not in repr(s)
+    assert s.openai_api_key.get_secret_value() == "sk-test-openai"
 
 
 def test_get_settings_is_cached():

@@ -1,0 +1,15 @@
+# Copy to config/skill_agent.yaml (ignored by git) and adjust to your machine.
+api_base: https://<API_ID>.execute-api.eu-central-1.amazonaws.com
+output_dir: <PROJECTS_DIR>/personal-data-engineering-toolkit/skills
+state_file: config/skill_agent_state.json
+
+scan_targets:
+  - path: <PROJECTS_DIR>/ai-platform-project-v1
+    patterns: [CLAUDE.md]
+    project_name: ai-platform-project-v1
+    action: extract
+
+  - path: <PROJECTS_DIR>/personal-data-engineering-toolkit/skills
+    patterns: [SKILL.md]
+    project_name: personal-data-engineering-toolkit
+    action: reindex

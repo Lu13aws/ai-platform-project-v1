@@ -45,7 +45,7 @@ which are acceptable for a portfolio demo context.
 |---|---|---|
 | Define AI system purpose and scope | ✅ Done | CLAUDE.md — full platform purpose documented |
 | Define risk tolerance | ⚠️ Partial | Cost controls + AWS Budgets; no formal AI risk policy document |
-| Assign accountability for AI outputs | ✅ Done | Platform owner (luciano.10@hotmail.de) identified; LinkedIn Review requires manual approval |
+| Assign accountability for AI outputs | ✅ Done | Platform owner (<OWNER_EMAIL>) identified; LinkedIn Review requires manual approval |
 | Document AI model used + version | ⚠️ Partial | LLM provider configured via `settings.py`; no formal model card |
 | Define acceptable use policy | ⚠️ Partial | CLAUDE.md defines scope and non-goals; no separate AUP document |
 | Establish review cadence | ⚠️ Partial | Weekly pipeline runs; no formal review process documented |
@@ -139,7 +139,7 @@ which are acceptable for a portfolio demo context.
 
 | Control | Status | Evidence |
 |---|---|---|
-| RDS in private VPC | ✅ Done | `ai-platform-db-corp` in `vpc-07f835a61e67a0271`, no public endpoint |
+| RDS in private VPC | ✅ Done | `ai-platform-db-corp` in `<VPC_ID>`, no public endpoint |
 | Security groups scoped | ✅ Done | Port 5432 accessible from Lambda SG only |
 | Physical data isolation (private vs public) | ✅ Done | Separate RDS instance `ai-platform-db-corp`; `corp_db.py` engine never shared |
 | WAF on API Gateway | ❌ Missing | No rate limiting or WAF rules configured |

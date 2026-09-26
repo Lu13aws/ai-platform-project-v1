@@ -94,3 +94,11 @@ node_modules/
 .next/
 out/
 .env.local
+
+# Local tool state and per-machine config (values live only on the owner's machine)
+config/skill_agent.yaml
+config/skill_agent_state.json
+response*.json
+README.pdf
+*.tfstate
+deploy.env

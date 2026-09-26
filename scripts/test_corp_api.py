@@ -10,9 +10,10 @@ from pathlib import Path
 
 import boto3
 import httpx
+from _aws import require_env
 
-CORP_API = "https://3odo5043uh.execute-api.eu-central-1.amazonaws.com/api/v1/corp"
-COGNITO_CLIENT_ID = "3vptapgfltcov01fo7enpld3it"
+CORP_API = require_env("CORP_API_BASE") + "/api/v1/corp"
+COGNITO_CLIENT_ID = require_env("CORP_COGNITO_CLIENT_ID")
 REGION = "eu-central-1"
 
 
@@ -34,7 +35,7 @@ async def main() -> None:
     if not password:
         password = input("Admin password: ")
 
-    token = get_token("luciano.10@hotmail.de", password)
+    token = get_token(require_env("CORP_ADMIN_EMAIL"), password)
     print(f"Token obtained ({len(token)} chars)")
 
     headers = {"Authorization": f"Bearer {token}"}

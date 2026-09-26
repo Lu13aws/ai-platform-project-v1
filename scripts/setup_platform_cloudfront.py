@@ -8,11 +8,12 @@ Run once:
 import json
 
 import boto3
+from _aws import account_id, require_env
 
 REGION = "eu-central-1"
 BUCKET = "platform.bridging-data.com"
 DOMAIN = "platform.bridging-data.com"
-CERT_ARN = "arn:aws:acm:us-east-1:759302162548:certificate/b1477709-fef7-46d6-8997-6da8e09e5a4f"
+CERT_ARN = require_env("PLATFORM_ACM_CERT_ARN")
 HOSTED_ZONE_ID = "Z07664873NC72578ZNY1H"
 
 
@@ -105,7 +106,7 @@ def main() -> None:
             "Resource": f"arn:aws:s3:::{BUCKET}/*",
             "Condition": {
                 "StringEquals": {
-                    "AWS:SourceArn": f"arn:aws:cloudfront::759302162548:distribution/{dist_id}"
+                    "AWS:SourceArn": f"arn:aws:cloudfront::{account_id()}:distribution/{dist_id}"
                 }
             },
         }],

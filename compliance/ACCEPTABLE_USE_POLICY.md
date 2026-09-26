@@ -3,7 +3,7 @@
 **Version:** 1.0  
 **Date:** June 2026  
 **Applies to:** AI Knowledge & Intelligence Platform (platform.bridging-data.com and corporate prototype)  
-**Owner:** Luciano (luciano.10@hotmail.de)
+**Owner:** Luciano (<OWNER_EMAIL>)
 
 ---
 

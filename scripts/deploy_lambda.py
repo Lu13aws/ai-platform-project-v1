@@ -17,10 +17,11 @@ import time
 from pathlib import Path
 
 import boto3
+from _aws import account_id, require_env
 from _secrets import ensure_secret_merged, grant_secret_read
 from aiplatform.settings import settings
 
-ACCOUNT_ID = "759302162548"
+ACCOUNT_ID = account_id()
 REGION = "eu-central-1"
 FUNCTION_NAME = "ai-platform-rag-demo"
 ECR_IMAGE = f"{ACCOUNT_ID}.dkr.ecr.{REGION}.amazonaws.com/ai-platform-rag-demo:lambda"
@@ -37,8 +38,8 @@ _BASIC_POLICY = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRol
 # Cognito — the *public* pool (apps/knowledge_platform + apps/rag_demo both
 # authenticate against this one; it is NOT the same pool apps/corp_api uses,
 # see scripts/deploy_corp_api.py / scripts/setup_platform_cognito.py).
-COGNITO_USER_POOL_ID = "eu-central-1_FPrGewp3l"
-COGNITO_CLIENT_ID = "52gsvhl73b3bvaigpmrfbknltq"
+COGNITO_USER_POOL_ID = require_env("PLATFORM_COGNITO_USER_POOL_ID")
+COGNITO_CLIENT_ID = require_env("PLATFORM_COGNITO_CLIENT_ID")
 COGNITO_ISSUER = f"https://cognito-idp.{REGION}.amazonaws.com/{COGNITO_USER_POOL_ID}"
 
 # Routes that must require a valid Cognito JWT: the 5 LinkedIn admin routes

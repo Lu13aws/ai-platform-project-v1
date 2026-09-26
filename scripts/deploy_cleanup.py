@@ -18,8 +18,9 @@ import time
 from pathlib import Path
 
 import boto3
+from _aws import account_id
 
-ACCOUNT_ID = "759302162548"
+ACCOUNT_ID = account_id()
 REGION = "eu-central-1"
 
 FUNCTION_NAME = "ai-platform-cleanup"

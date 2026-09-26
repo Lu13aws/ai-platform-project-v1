@@ -1,6 +1,6 @@
 const CORP_BASE =
   process.env.NEXT_PUBLIC_CORP_API_BASE ??
-  'https://3odo5043uh.execute-api.eu-central-1.amazonaws.com'
+  'http://localhost:8003'
 
 export interface CorpSource {
   title: string | null

@@ -3,7 +3,7 @@
 **Document type:** GDPR Article 30 Record  
 **Version:** 1.0  
 **Date:** June 2026  
-**Controller:** Luciano (luciano.10@hotmail.de)  
+**Controller:** Luciano (<OWNER_EMAIL>)  
 **Platform:** AI Knowledge & Intelligence Platform (ai-platform-project-v1)
 
 ---
@@ -13,10 +13,10 @@
 | Field | Value |
 |---|---|
 | Controller name | Luciano |
-| Contact email | luciano.10@hotmail.de |
+| Contact email | <OWNER_EMAIL> |
 | Deployment region | AWS eu-central-1 (Frankfurt, Germany) |
 | Platform URL | platform.bridging-data.com |
-| Corporate API URL | https://3odo5043uh.execute-api.eu-central-1.amazonaws.com |
+| Corporate API URL | https://<CORP_API_ID>.execute-api.eu-central-1.amazonaws.com |
 
 ---
 

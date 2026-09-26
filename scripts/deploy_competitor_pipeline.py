@@ -24,10 +24,11 @@ import sys
 from pathlib import Path
 
 import boto3
+from _aws import account_id
 from _secrets import ensure_secret_merged, grant_secret_read
 from aiplatform.settings import settings
 
-ACCOUNT_ID = "759302162548"
+ACCOUNT_ID = account_id()
 REGION = "eu-central-1"
 
 FUNCTION_NAME = "ai-platform-competitor-pipeline"

@@ -2,7 +2,7 @@
 
 **Version:** 1.0  
 **Date:** June 2026  
-**Controller:** Luciano (luciano.10@hotmail.de)  
+**Controller:** Luciano (<OWNER_EMAIL>)  
 **Platform:** AI Knowledge & Intelligence Platform
 
 ---

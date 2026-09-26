@@ -19,9 +19,10 @@ import sys
 import time
 
 import boto3
+from _aws import account_id, require_env, vpc_config
 from _secrets import ensure_secret_merged
 
-ACCOUNT_ID = "759302162548"
+ACCOUNT_ID = account_id()
 REGION = "eu-central-1"
 FUNCTION_NAME = "ai-platform-corp-api"
 HANDLER = "apps.corp_api.lambda_handler.handler"
@@ -39,12 +40,12 @@ CORP_APP_SECRET_NAME = "ai-platform/corp-app-secrets"
 ECR_REPO = f"{ACCOUNT_ID}.dkr.ecr.{REGION}.amazonaws.com/ai-platform-rag-demo"
 
 # VPC config
-VPC_SUBNET_IDS = ["subnet-0876141c2e0feca97", "subnet-03d4fde53ac4bd7e5"]
-LAMBDA_SG_ID = "sg-0c9d9c6ec4dc513ad"
+VPC_SUBNET_IDS = [vpc_config()["subnets"]["private-1a"], vpc_config()["subnets"]["private-1b"]]
+LAMBDA_SG_ID = vpc_config()["security_groups"]["lambda"]
 
 # Cognito
-COGNITO_USER_POOL_ID = "eu-central-1_EAxyIp3WZ"
-COGNITO_CLIENT_ID = "3vptapgfltcov01fo7enpld3it"
+COGNITO_USER_POOL_ID = require_env("CORP_COGNITO_USER_POOL_ID")
+COGNITO_CLIENT_ID = require_env("CORP_COGNITO_CLIENT_ID")
 COGNITO_ISSUER = f"https://cognito-idp.{REGION}.amazonaws.com/{COGNITO_USER_POOL_ID}"
 
 _BASIC_POLICY = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"

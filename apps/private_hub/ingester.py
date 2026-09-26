@@ -7,7 +7,7 @@ and other non-content directories.
 
 Usage:
     ingester = FolderIngester(session)
-    result = await ingester.run([Path("C:/Users/lucia/OneDrive/Dokumente/private-knowledge-hub")])
+    result = await ingester.run([Path(os.environ.get("PRIVATE_HUB_DIR", "./private-knowledge-hub"))])
 """
 
 from dataclasses import dataclass, field

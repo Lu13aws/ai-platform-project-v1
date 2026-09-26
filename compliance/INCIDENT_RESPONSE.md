@@ -2,7 +2,7 @@
 
 **Version:** 1.0  
 **Date:** June 2026  
-**Owner:** Luciano (luciano.10@hotmail.de)  
+**Owner:** Luciano (<OWNER_EMAIL>)  
 **Platform:** AI Knowledge & Intelligence Platform
 
 ---
@@ -151,7 +151,7 @@ For P1 and P2 incidents:
 
 | Role | Contact |
 |---|---|
-| Platform owner / data controller | Luciano — luciano.10@hotmail.de |
+| Platform owner / data controller | Luciano — <OWNER_EMAIL> |
 | AWS account access | Via IAM with MFA |
 | OpenAI support | https://help.openai.com |
 | Anthropic support | https://console.anthropic.com |

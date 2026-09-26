@@ -19,8 +19,9 @@ import sys
 from pathlib import Path
 
 import httpx
+from _aws import require_env
 
-API_URL = "https://72w6p1rx38.execute-api.eu-central-1.amazonaws.com"
+API_URL = require_env("API_BASE")
 INGEST_ENDPOINT = f"{API_URL}/api/v1/kp/ingest-skill"
 
 COMPLIANCE_DIR = Path(__file__).parent.parent / "compliance"

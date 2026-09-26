@@ -14,13 +14,14 @@ Usage:
 
 
 import boto3
+from _aws import account_id, vpc_config
 
 REGION = "eu-central-1"
-ACCOUNT_ID = "759302162548"
+ACCOUNT_ID = account_id()
 
-VPC_ID = "vpc-07f835a61e67a0271"
-PRIVATE_SUBNETS = ["subnet-0876141c2e0feca97", "subnet-03d4fde53ac4bd7e5"]  # 1a + 1b
-LAMBDA_SG_ID = "sg-0c9d9c6ec4dc513ad"  # ai-platform-lambda-sg
+VPC_ID = vpc_config()["vpc_id"]
+PRIVATE_SUBNETS = [vpc_config()["subnets"]["private-1a"], vpc_config()["subnets"]["private-1b"]]  # 1a + 1b
+LAMBDA_SG_ID = vpc_config()["security_groups"]["lambda"]  # ai-platform-lambda-sg
 
 DB_IDENTIFIER = "ai-platform-db-corp"
 DB_NAME = "aiplatform_corp"

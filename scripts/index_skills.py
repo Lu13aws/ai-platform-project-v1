@@ -6,7 +6,7 @@ Sends skill content via HTTP to the /api/v1/kp/ingest-skill endpoint so the Lamb
 
 Usage:
     uv run python scripts/index_skills.py
-    uv run python scripts/index_skills.py --api-base https://72w6p1rx38.execute-api.eu-central-1.amazonaws.com
+    uv run python scripts/index_skills.py --api-base https://<API_ID>.execute-api.eu-central-1.amazonaws.com
 
 Re-run at any time — SHA-256 dedup skips unchanged files automatically.
 """
@@ -16,9 +16,10 @@ import sys
 from pathlib import Path
 
 import httpx
+from _aws import env
 
-SKILLS_DIR = Path("C:/Users/lucia/git_projects/personal-data-engineering-toolkit/skills")
-DEFAULT_API_BASE = "https://72w6p1rx38.execute-api.eu-central-1.amazonaws.com"
+SKILLS_DIR = Path(__file__).resolve().parents[2] / "personal-data-engineering-toolkit" / "skills"  # sibling repo
+DEFAULT_API_BASE = env("API_BASE") or None  # from .env
 ENDPOINT = "/api/v1/kp/ingest-skill"
 
 
@@ -74,6 +75,8 @@ def index_skills(api_base: str) -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--api-base", default=DEFAULT_API_BASE)
+    parser.add_argument("--api-base", default=DEFAULT_API_BASE, help="default: API_BASE from .env")
     args = parser.parse_args()
+    if not args.api_base:
+        parser.error("--api-base or API_BASE in .env is required")
     index_skills(args.api_base)
