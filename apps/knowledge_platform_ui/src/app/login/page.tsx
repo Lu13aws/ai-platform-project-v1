@@ -137,16 +137,12 @@ export default function LoginPage() {
               {loading ? 'Signing in…' : 'Sign in'}
             </button>
             <p className="text-xs text-center text-slate-500 pt-1">
-              No account?{' '}
-              <button type="button" onClick={() => { setStep('register'); clearError() }}
-                className="text-blue-400 hover:text-blue-300 underline">
-                Create one
-              </button>
+              Accounts are created by the platform owner; self-registration is closed.
             </p>
           </form>
         )}
 
-        {/* Register form */}
+        {/* Register form (unreachable while self-registration is closed) */}
         {step === 'register' && (
           <form onSubmit={handleRegister} className="space-y-4">
             {emailPwFields}
