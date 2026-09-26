@@ -62,6 +62,17 @@ async def _integrity_check() -> dict:
         await engine.dispose()  # asyncio.run() gives every call its own event loop
 
 
+async def _list_documents(app_name: str) -> list[dict]:
+    """Read-only document metadata (no content) of one namespace."""
+    from aiplatform.storage.database import engine
+    from aiplatform.storage.integrity import list_document_metadata
+
+    try:
+        return await list_document_metadata(engine, app_name)
+    finally:
+        await engine.dispose()
+
+
 def _run(coro):
     """asyncio.run() closes the loop; Mangum needs a current one again when the same warm
     container serves the next HTTP request, otherwise every request returns 500."""
@@ -82,4 +93,10 @@ def handler(event, context):
         return {"status": "ok", "applied": applied}
     if event.get("action") == "integrity_check":
         return {"status": "ok", **_run(_integrity_check())}
+    if event.get("action") == "list_documents":
+        app_name = event.get("app_name")
+        if not isinstance(app_name, str) or not app_name:
+            return {"status": "error", "error": "list_documents needs a non-empty app_name"}
+        documents = _run(_list_documents(app_name))
+        return {"status": "ok", "app_name": app_name, "count": len(documents), "documents": documents}
     return _mangum(event, context)

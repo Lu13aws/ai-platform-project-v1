@@ -34,3 +34,24 @@ async def run_integrity_check(engine: AsyncEngine) -> dict:
         totals = dict((await conn.execute(text(TOTALS_SQL))).mappings().one())
         per_app = [dict(row) for row in (await conn.execute(text(PER_APP_SQL))).mappings()]
     return {"totals": totals, "per_app": per_app}
+
+
+DOCUMENTS_SQL = """
+SELECT CAST(d.id AS TEXT)           AS id,
+       d.title                      AS title,
+       d.source_uri                 AS source_uri,
+       d.mime_type                  AS mime_type,
+       CAST(d.created_at AS TEXT)   AS created_at,
+       (SELECT COUNT(*) FROM chunks c WHERE c.document_id = d.id) AS chunks
+  FROM documents d
+ WHERE d.app_name = :app_name
+ ORDER BY d.created_at, d.source_uri
+"""
+
+
+async def list_document_metadata(engine: AsyncEngine, app_name: str) -> list[dict]:
+    """Title, source_uri, type, date and chunk count per document of one namespace. No content."""
+    async with engine.connect() as conn:
+        await conn.execute(text("SET TRANSACTION READ ONLY"))
+        rows = (await conn.execute(text(DOCUMENTS_SQL), {"app_name": app_name})).mappings()
+        return [dict(row) for row in rows]

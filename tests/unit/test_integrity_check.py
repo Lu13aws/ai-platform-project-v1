@@ -136,3 +136,49 @@ def test_http_request_is_still_served_after_a_direct_invoke_action(lambda_handle
     response = lambda_handler.handler(http_event, None)
 
     assert response["statusCode"] == 200
+
+
+def test_document_metadata_query_lists_one_namespace_without_content():
+    from aiplatform.storage.integrity import DOCUMENTS_SQL
+
+    conn = sqlite3.connect(":memory:")
+    conn.executescript(
+        """
+        CREATE TABLE documents (id INTEGER PRIMARY KEY, title TEXT, source_uri TEXT, mime_type TEXT,
+                                created_at TEXT, app_name TEXT, content_hash TEXT);
+        CREATE TABLE chunks (id INTEGER PRIMARY KEY, document_id INTEGER, content TEXT);
+        INSERT INTO documents VALUES (1, 'A', 'notes/a.md', 'text/markdown', '2026-01-02', 'private_hub', 'h1');
+        INSERT INTO documents VALUES (2, 'B', 'notes/b.md', 'text/markdown', '2026-01-01', 'private_hub', 'h2');
+        INSERT INTO documents VALUES (3, 'C', 'skills/c.md', 'text/markdown', '2026-01-03', 'skills_hub', 'h3');
+        INSERT INTO chunks VALUES (1, 1, 'secret body'), (2, 1, 'secret body 2'), (3, 2, 'more');
+        """
+    )
+    cur = conn.execute(DOCUMENTS_SQL, {"app_name": "private_hub"})
+    cols = [c[0] for c in cur.description]
+    rows = [dict(zip(cols, r, strict=True)) for r in cur.fetchall()]
+
+    assert [r["source_uri"] for r in rows] == ["notes/b.md", "notes/a.md"]  # oldest first
+    assert [r["chunks"] for r in rows] == [1, 2]
+    assert "content" not in cols and "content_hash" not in cols
+
+
+def test_list_documents_action_returns_the_metadata(lambda_handler, monkeypatch):
+    docs = [{"title": "A", "source_uri": "notes/a.md", "chunks": 2}]
+    listing = AsyncMock(return_value=docs)
+    monkeypatch.setattr(lambda_handler, "_list_documents", listing)
+
+    result = lambda_handler.handler({"action": "list_documents", "app_name": "private_hub"}, None)
+
+    assert result == {"status": "ok", "app_name": "private_hub", "count": 1, "documents": docs}
+    listing.assert_awaited_once_with("private_hub")
+    asyncio.get_event_loop_policy().get_event_loop()  # loop is usable again for the next HTTP request
+
+
+def test_list_documents_action_requires_an_app_name(lambda_handler, monkeypatch):
+    listing = AsyncMock()
+    monkeypatch.setattr(lambda_handler, "_list_documents", listing)
+
+    result = lambda_handler.handler({"action": "list_documents"}, None)
+
+    assert result["status"] == "error"
+    listing.assert_not_called()
