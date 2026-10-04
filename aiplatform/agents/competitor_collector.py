@@ -176,11 +176,15 @@ class CompetitorCollectorAgent:
         for sig in direct_signals:
             source_name = sig.source.name
             try:
-                if sig.signal_type == "pricing_change":
-                    # Update the stored hash on the source
-                    new_hash = sig.summary[:64] if len(sig.summary) <= 64 else hashlib.sha256(sig.summary.encode()).hexdigest()
-                    sig.source.last_content_hash = new_hash
-
+                # NOTE: `source.last_content_hash` for pricing_change signals is already
+                # set correctly inside `_fetch_pricing` (the price-token fingerprint hash).
+                # Do NOT recompute/overwrite it here from `sig.summary` — the summary text
+                # is a fixed template per source (same url/company_name every run), so
+                # hashing it produced a near-constant value that permanently desynced the
+                # stored hash from the real page fingerprint, guaranteeing a mismatch (and
+                # therefore a signal) on every subsequent run regardless of actual change.
+                # This was a second, compounding bug behind the "fires every single week"
+                # behaviour — see competitor_collector.py::_fetch_pricing docstring.
                 session.add(CompetitorSignal(
                     source_id=sig.source.id,
                     raw_content_id=None,
@@ -299,7 +303,18 @@ def _parse_html_blog(html: str, source: CompetitorSource, base_url: str) -> list
 async def _fetch_pricing(
     client: httpx.AsyncClient, source: CompetitorSource
 ) -> _DirectSignal | None:
-    """Hash-compare pricing page — return signal only if content changed."""
+    """Fingerprint-compare a pricing page's price/plan tokens — return a signal only if
+    the set of detected prices actually changed, not on any unrelated page edit.
+
+    Previously this hashed ALL visible page text (ads, timestamps, cookie banners,
+    reworded marketing copy included), which changed on essentially every fetch and
+    fired a false `pricing_change` signal every week for every source (confirmed in
+    production: 78/78 company-weeks). Now we extract only currency-amount tokens
+    (optionally paired with a billing-period suffix, e.g. "$29/mo", "€49/yr") and hash
+    a normalized, deduped, sorted representation of those tokens instead. Unrelated
+    page changes no longer affect the fingerprint; only a change in the actual set of
+    displayed prices does.
+    """
     response = await client.get(source.url)
     response.raise_for_status()
     check_response_size(response)
@@ -307,13 +322,28 @@ async def _fetch_pricing(
     soup = BeautifulSoup(response.text, "lxml")
     for tag in soup(["script", "style", "nav", "footer", "header", "noscript"]):
         tag.decompose()
-    text = re.sub(r"\s+", " ", soup.get_text()).strip()[:5_000]
-    new_hash = hashlib.sha256(text.encode()).hexdigest()
+    text = re.sub(r"\s+", " ", soup.get_text()).strip()
+
+    price_tokens = _extract_price_tokens(text)
+
+    if not price_tokens:
+        # No price-looking tokens found anywhere on the page at all — most likely a
+        # JS-rendered pricing page whose static HTML carries no visible price text.
+        # Deliberately do NOT fall back to hashing the whole page (that's the exact
+        # behaviour being removed) and do NOT emit a signal: a page with zero
+        # extractable prices gives us nothing reliable to compare. We also leave
+        # `last_content_hash` untouched so that a future run which *does* find tokens
+        # is compared against the last real price fingerprint, not clobbered here.
+        print(f"  [pricing] {source.name}: no price tokens found, skipping change detection")
+        return None
+
+    fingerprint = "|".join(price_tokens)
+    new_hash = hashlib.sha256(fingerprint.encode()).hexdigest()
 
     if source.last_content_hash == new_hash:
         return None
 
-    # Content changed — store new hash and create signal
+    # Price fingerprint changed — store new hash and create signal
     source.last_content_hash = new_hash
     return _DirectSignal(
         source=source,
@@ -324,6 +354,66 @@ async def _fetch_pricing(
         impact_level="Medium",
         url=source.url,
     )
+
+
+# ── Pricing token extraction ────────────────────────────────────────────────────
+
+_CURRENCY_SYMBOLS = "$€£"
+
+# Matches a currency amount (e.g. "$29", "€1,299.00", "£9.99") optionally followed
+# by a billing-period suffix (e.g. "/mo", "/month", "per year", "monthly").
+_PRICE_TOKEN_RE = re.compile(
+    rf"(?P<currency>[{_CURRENCY_SYMBOLS}])\s?"
+    r"(?P<amount>\d{1,3}(?:,\d{3})*(?:\.\d{1,2})?)"
+    r"(?P<period>\s?/\s?[a-zA-Z]+|\s+per\s+[a-zA-Z]+|\s*(?:monthly|annually|yearly|biweekly))?",
+    re.IGNORECASE,
+)
+
+# Canonicalizes the many ways a billing period is written to one short code, so
+# "$29/mo", "$29 per month", and "$29 monthly" all normalize to the same token.
+_PERIOD_ALIASES = {
+    "mo": "mo", "month": "mo", "months": "mo", "monthly": "mo",
+    "yr": "yr", "year": "yr", "years": "yr", "yearly": "yr", "annually": "yr", "annum": "yr",
+    "wk": "wk", "week": "wk", "weekly": "wk",
+    "seat": "seat", "seats": "seat",
+    "user": "user", "users": "user",
+}
+
+
+def _normalize_period(raw: str | None) -> str:
+    if not raw:
+        return ""
+    words = re.findall(r"[a-zA-Z]+", raw)
+    if not words:
+        return ""
+    # The unit word is always last ("/mo" -> "mo", "per month" -> "month").
+    canon = _PERIOD_ALIASES.get(words[-1].lower())
+    return f"/{canon}" if canon else ""
+
+
+def _normalize_amount(raw: str) -> str:
+    """Normalize "1,299.00" / "29" / "29.00" / "9.99" to a canonical decimal string
+    (no thousands separator, no trailing zero padding) so formatting-only changes
+    don't change the fingerprint."""
+    value = float(raw.replace(",", ""))
+    text = f"{value:.2f}".rstrip("0").rstrip(".")
+    return text or "0"
+
+
+def _extract_price_tokens(text: str) -> list[str]:
+    """Extract a normalized, deduped, sorted list of price tokens from page text.
+
+    Sorting + deduping means unrelated reordering of page content (e.g. tier cards
+    rendered in a different DOM order) does not change the fingerprint — only the
+    actual *set* of distinct prices shown on the page matters.
+    """
+    tokens: set[str] = set()
+    for match in _PRICE_TOKEN_RE.finditer(text):
+        currency = match.group("currency")
+        amount = _normalize_amount(match.group("amount"))
+        period = _normalize_period(match.group("period"))
+        tokens.add(f"{currency}{amount}{period}")
+    return sorted(tokens)
 
 
 async def _fetch_financial(
