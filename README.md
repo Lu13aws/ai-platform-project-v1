@@ -12,7 +12,7 @@ Modular AI knowledge platform built on AWS using PostgreSQL + pgvector, FastAPI,
 The system ingests structured and unstructured documents, chunks and embeds them, and retrieves grounded answers with source references in response to natural language questions.
 Designed as a reusable foundation for multiple applications — RAG demo, technology radar, regulatory radar, competitor radar, private knowledge hub, and a corporate LLM prototype — all sharing the same ingestion, retrieval, and agent infrastructure.
 
-**Live:** [platform.bridging-data.com](https://platform.bridging-data.com) — full Knowledge Platform with Cognito login (self-registration), Technology Radar, Competitor Intelligence, Regulatory Radar, AI Chat, Skills Hub, and Corporate Chat (Phase 6).
+**Live:** [platform.bridging-data.com](https://platform.bridging-data.com) — full Knowledge Platform with Cognito login (accounts are created by the owner; self-registration closed since 2026-09-26), Technology Radar, Competitor Intelligence, Regulatory Radar, AI Chat, Skills Hub, and Corporate Chat (Phase 6).
 
 ---
 
@@ -233,7 +233,7 @@ The `docker/postgres/init.sql` script enables the `vector` and `uuid-ossp` exten
 
 - **Frontend (Phase 5+):** `https://platform.bridging-data.com`
   - CloudFront → S3 static export (Next.js)
-  - Cognito User Pool `ai-platform-public` — self-registration + email verification
+  - Cognito User Pool `ai-platform-public` — admin-created accounts only (`AllowAdminCreateUserOnly=true`; self-registration closed since 2026-09-26)
   - **Single Cognito pool** with `corp-admins` group for RBAC — LinkedIn Review + Corp Chat gated behind group membership (frontend guard + backend JWT check)
   - GitHub Actions auto-deploy on push to `main` (changes in `apps/knowledge_platform_ui/`)
 
@@ -327,7 +327,7 @@ rag-demo query "What are the pillars of the AWS Well-Architected Framework?"
 **Run tests:**
 
 ```bash
-make test-unit          # 36 tests, no Docker required
+make test-unit          # 179 tests, no Docker required
 make test-integration   # requires make dev-up + make migrate
 ```
 
@@ -752,10 +752,11 @@ Then manually re-ingest the EU AI Act, GDPR, and FINMA PDFs using the steps abov
 - Pre-existing bug: all skills were showing `category="other"` because `skill://ai/...` URIs have no "skills" path component to parse
 - Fix benefits all 93 indexed documents: `ai (13)`, `aws (25)`, `compliance (8)`, `development (13)`, `radar (7)`, `competitor (7)`, `regulatory (3)`, etc.
 
-**Coverage after this session:**
-- NIST AI RMF: ~85% (up from ~70%)
-- GDPR / Swiss DSG: ~85% (up from ~75%)
-- AWS Well-Architected (Security Pillar): ~85% (unchanged — technical controls already solid)
+**Coverage (self-assessment, see `compliance/SECURITY_CONTROLS.md` and `research/phase6/compliance_mapping_v2.md`):**
+- NIST AI RMF: ~70% (14 of 20 controls fully met)
+- GDPR / Swiss DSG: ~75% (12 of 16 controls fully met)
+- AWS Well-Architected (Security Pillar): ~85%
+- An earlier version of this entry claimed ~85% for all three frameworks; that figure was not backed by the mapping and has been corrected.
 
 ---
 
