@@ -4,6 +4,7 @@ Cleanup Agent — enforces data retention policies.
 Retention rules (from CLAUDE.md):
   raw_articles                : 30 days  (expires_at column set on insert)
   radar_reports               : 24 months (generated_at < cutoff → delete S3 + DB row)
+  radar_entry_history         : 24 months (run_date < cutoff → delete DB row)
   regulatory_reports          : 24 months (generated_at < cutoff → delete S3 JSON/HTML + DB row)
   regulatory_documents        : KEEP — version history required for historical comparison
   regulatory_changes          : KEEP — report_id set to NULL on report delete, changes retained
@@ -21,13 +22,14 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import delete, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from aiplatform.agents import radar_history
 from aiplatform.storage.competitor_models import (
     CompetitorRawContent,
     CompetitorReport,
     CompetitorSignal,
 )
 from aiplatform.storage.content_models import LinkedInPost
-from aiplatform.storage.radar_models import RadarReport, RawArticle
+from aiplatform.storage.radar_models import RadarEntryHistory, RadarReport, RawArticle
 from aiplatform.storage.regulatory_models import RegulatoryReport
 from aiplatform.storage.s3 import S3Client
 
@@ -46,6 +48,10 @@ def _conditions() -> dict:
     return {
         "raw_articles": (RawArticle, RawArticle.expires_at < now),
         "radar_reports": (RadarReport, RadarReport.generated_at < _cutoff(_REPORT_RETENTION_MONTHS)),
+        "radar_entry_history": (
+            RadarEntryHistory,
+            RadarEntryHistory.run_date < _cutoff(_REPORT_RETENTION_MONTHS).date(),
+        ),
         "regulatory_reports": (
             RegulatoryReport,
             RegulatoryReport.generated_at < _cutoff(_REPORT_RETENTION_MONTHS),
@@ -64,6 +70,7 @@ def _conditions() -> dict:
 class CleanupResult:
     articles_deleted: int = 0
     reports_deleted: int = 0
+    history_rows_deleted: int = 0
     regulatory_reports_deleted: int = 0
     competitor_raw_content_deleted: int = 0
     competitor_signals_deleted: int = 0
@@ -80,6 +87,7 @@ class CleanupResult:
         return (
             f"articles_deleted={self.articles_deleted} "
             f"reports_deleted={self.reports_deleted} "
+            f"history_rows_deleted={self.history_rows_deleted} "
             f"regulatory_reports_deleted={self.regulatory_reports_deleted} "
             f"competitor_raw_deleted={self.competitor_raw_content_deleted} "
             f"competitor_signals_deleted={self.competitor_signals_deleted} "
@@ -97,8 +105,13 @@ class CleanupAgent:
     async def run(self, session: AsyncSession) -> CleanupResult:
         result = CleanupResult()
 
+        # radar_entry_history is created by the radar pipeline; a cleanup run before its first
+        # run must not fail on a missing table.
+        await radar_history.ensure_table(session)
+
         await self._delete_expired_articles(session, result)
         await self._delete_old_reports(session, result)
+        await self._delete_old_radar_history(session, result)
         await self._delete_old_regulatory_reports(session, result)
         await self._delete_expired_competitor_raw_content(session, result)
         await self._delete_expired_competitor_signals(session, result)
@@ -112,6 +125,9 @@ class CleanupAgent:
         await session.execute(text("SET TRANSACTION READ ONLY"))
         counts = {}
         for name, (model, condition) in _conditions().items():
+            if not await session.scalar(text(f"SELECT to_regclass('{model.__tablename__}')")):
+                counts[name] = {"would_delete": 0, "total": 0}
+                continue
             would_delete = await session.scalar(select(func.count()).select_from(model).where(condition))
             total = await session.scalar(select(func.count()).select_from(model))
             counts[name] = {"would_delete": would_delete, "total": total}
@@ -146,6 +162,12 @@ class CleanupAgent:
             result.reports_deleted += 1
 
         print(f"  [cleanup] radar_reports deleted: {result.reports_deleted}")
+
+    async def _delete_old_radar_history(self, session: AsyncSession, result: CleanupResult) -> None:
+        stmt = delete(RadarEntryHistory).where(_conditions()["radar_entry_history"][1])
+        db_result = await session.execute(stmt)
+        result.history_rows_deleted = db_result.rowcount
+        print(f"  [cleanup] radar_entry_history deleted: {result.history_rows_deleted}")
 
     async def _delete_old_regulatory_reports(
         self, session: AsyncSession, result: CleanupResult

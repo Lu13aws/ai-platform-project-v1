@@ -4,6 +4,7 @@ Cleanup Lambda handler.
 Triggered monthly by EventBridge. Deletes:
   - raw_articles where expires_at < NOW()  (30-day retention)
   - radar_reports older than 24 months + their S3 objects
+  - radar_entry_history rows older than 24 months
 """
 
 import asyncio
@@ -21,6 +22,7 @@ async def _run_cleanup() -> dict:
     return {
         "articles_deleted": result.articles_deleted,
         "reports_deleted": result.reports_deleted,
+        "history_rows_deleted": result.history_rows_deleted,
         "s3_objects_deleted": result.s3_objects_deleted,
         "errors": result.errors,
     }

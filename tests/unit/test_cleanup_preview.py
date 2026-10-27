@@ -19,6 +19,7 @@ def test_every_retention_category_has_a_condition():
     assert set(_conditions()) == {
         "raw_articles",
         "radar_reports",
+        "radar_entry_history",
         "regulatory_reports",
         "competitor_raw_content",
         "competitor_signals",

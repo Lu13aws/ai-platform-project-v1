@@ -59,7 +59,7 @@ A look at the current schema shows gaps that should be closed now, because histo
 
 | Need | Current state | Gap | Proposal |
 |---|---|---|---|
-| Radar movement history | `radar_entries` keeps only `category` and `previous_category`; each weekly run overwrites the snapshot | Movement over six months is not queryable from the database. It can only be reconstructed from `radar_signals` or from the JSON reports in S3 | Add a `radar_entry_history` table (one row per entry per run) as soon as possible; backfill from S3 report JSONs |
+| Radar movement history | `radar_entries` keeps only `category` and `previous_category`; each weekly run overwrites the snapshot | Movement over six months is not queryable from the database. It can only be reconstructed from `radar_signals` or from the JSON reports in S3 | Done: `radar_entry_history` (one row per entry per run), written by the radar pipeline after change detection; past runs rebuilt from the S3 report JSONs with the `backfill_history` action. Retained 24 months |
 | Common entity key | Radar uses `vendor`, competitor radar uses `company_name`, regulatory changes have no company at all | Cross-domain joins on vendor names are fragile ("Microsoft" vs "Microsoft Fabric") | A small `entities` mapping table (canonical name + aliases); regulatory changes are linked by topic (AI, Privacy, ...) rather than by company |
 | Citations that outlive the source | `competitor_signals` expire after 365 days, `raw_articles` after 30 days | A synthesis from month 1 would cite deleted rows by month 13 | Store a frozen snapshot of each cited signal (domain, ID, date, text, URL) inside the synthesis record |
 | Volume threshold | Target is about 200 competitor signals and 100 radar entries with movement history | Actual counts not checked yet | Run a count query in November; if below target, start with US-1 and US-2 only |
@@ -68,7 +68,7 @@ A look at the current schema shows gaps that should be closed now, because histo
 
 | Step | Content | When |
 |---|---|---|
-| 0 | Data readiness: history table, entity mapping, signal counts | November 2026 |
+| 0 | Data readiness: history table (done), entity mapping, signal counts | November 2026 |
 | 1 | SynthesisAgent with citation validation (US-1, US-2, US-6) | December 2026 |
 | 2 | ExecutiveReportAgent (US-5) | after two months of synthesis output |
 | 3 | StrategicAdvisorAgent (US-3, US-4) and the first Agentic RAG patterns | after step 2 |
@@ -96,4 +96,4 @@ the agents run on the existing shared Lambda image ([ADR 0004](../adr/0004-lambd
 
 1. What exactly counts as a pattern: same vendor in two domains within one month, or also topic-level links (for example a pricing move plus a new AI Act obligation)?
 2. Should synthesis outputs be visible on the public platform, or only to logged-in users?
-3. Does the backfill of radar history from S3 cover enough weeks, or does the six-month clock start only when the history table exists?
+3. Does the backfill of radar history from S3 cover enough weeks? Radar reports are kept 24 months, so every weekly run since Phase 2 should be recoverable; the `backfill_history` dry run reports the first and last date.
