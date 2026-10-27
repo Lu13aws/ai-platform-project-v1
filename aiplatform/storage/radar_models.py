@@ -6,14 +6,16 @@ Tables:
   raw_articles   — raw fetched content, expires after 30 days
   radar_signals  — LLM-extracted signals per article (retained 12 months)
   radar_entries  — current state of each technology (upserted each run)
+  radar_entry_history — one row per entry per run, the movement history for Phase 7 (retained 24 months)
   radar_reports  — generated report metadata (retained 24 months)
 """
 
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from uuid import UUID, uuid4
 
 from sqlalchemy import (
     Boolean,
+    Date,
     DateTime,
     Float,
     ForeignKey,
@@ -148,6 +150,37 @@ class RadarEntry(Base):
 
     __table_args__ = (
         UniqueConstraint("technology_name", "vendor", name="uq_radar_entries_tech_vendor"),
+    )
+
+
+class RadarEntryHistory(Base):
+    """Category of each technology as of one pipeline run.
+
+    radar_entries only knows this week and last week; this table keeps every run.
+    One row per (technology, vendor, run_date): a rerun on the same day overwrites its row.
+    """
+
+    __tablename__ = "radar_entry_history"
+
+    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    run_date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
+    technology_name: Mapped[str] = mapped_column(String(256), nullable=False)
+    vendor: Mapped[str] = mapped_column(String(128), nullable=False)
+    category: Mapped[str] = mapped_column(String(16), nullable=False)
+    previous_category: Mapped[str | None] = mapped_column(String(16))
+    trend: Mapped[str | None] = mapped_column(String(16))
+    signal_count: Mapped[int | None] = mapped_column(Integer)
+    origin: Mapped[str] = mapped_column(String(16), nullable=False)  # pipeline | backfill
+    recorded_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=lambda: datetime.now(UTC),
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "technology_name", "vendor", "run_date", name="uq_radar_entry_history_tech_vendor_date"
+        ),
     )
 
 

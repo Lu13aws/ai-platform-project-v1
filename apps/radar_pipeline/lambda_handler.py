@@ -6,6 +6,7 @@ Runs the full Technology Radar pipeline in sequence:
   1. CollectorAgent  — fetch articles from all active sources
   2. AnalyzerAgent   — LLM classification of unprocessed articles
   3. ChangeDetector  — detect category moves and new entries
+  3b. History        — copy radar_entries into radar_entry_history (movement history, Phase 7)
   4. ReporterAgent   — generate JSON + HTML report, upload to S3
   5. ReportIndexer   — index report into vector store (AI Chat)
   6. NotifierAgent   — send run summary + change report via SNS email
@@ -14,12 +15,17 @@ Each agent runs in its own DB session so failures in later phases
 do not roll back earlier committed data.
 
 Triggered by EventBridge weekly schedule (Monday 06:00 UTC).
+
+Direct invoke {"action": "backfill_history"} rebuilds radar_entry_history from the report
+JSONs on S3 (dry run unless "dry_run": false).
 """
 
 import asyncio
 import json
 import traceback
+from datetime import UTC, datetime
 
+from aiplatform.agents import radar_history
 from aiplatform.agents.analyzer import AnalyzerAgent
 from aiplatform.agents.change_detector import ChangeDetectionAgent, ChangeReport
 from aiplatform.agents.collector import CollectorAgent
@@ -40,6 +46,26 @@ async def _snapshot_previous_categories() -> None:
             text("UPDATE radar_entries SET previous_category = category")
         )
     print("[pipeline] snapshot: previous_category = category for all entries")
+
+
+async def _record_history() -> str:
+    # Non-critical: a failure here must not stop the report, but it is reported.
+    try:
+        async with get_async_session() as session:
+            count = await radar_history.record_run(session, datetime.now(UTC).date())
+        return f"recorded={count}"
+    except Exception as exc:
+        print(f"[pipeline] history failed: {exc}")
+        return f"error: {exc}"
+
+
+async def _backfill_history(dry_run: bool) -> dict:
+    try:
+        async with get_async_session() as session:
+            result = await radar_history.backfill(session, dry_run=dry_run)
+        return {"dry_run": dry_run, **result.as_dict()}
+    finally:
+        await engine.dispose()
 
 
 async def _run_pipeline() -> tuple[dict, ChangeReport | None]:
@@ -66,6 +92,9 @@ async def _run_pipeline() -> tuple[dict, ChangeReport | None]:
             change_report = await ChangeDetectionAgent().run(session)
         results["changes"] = str(change_report)
         print(f"[pipeline] changes: {results['changes']}")
+
+        print("[pipeline] phase 3b — history")
+        results["history"] = await _record_history()
 
         print("[pipeline] phase 4/4 — reporter")
         async with get_async_session() as session:
@@ -94,6 +123,10 @@ def handler(event, context):
     smoke = handle_smoke_test(event, "radar-pipeline")
     if smoke is not None:
         return smoke
+    if event.get("action") == "backfill_history":
+        # anything but an explicit false stays a dry run
+        result = asyncio.run(_backfill_history(dry_run=event.get("dry_run") is not False))
+        return {"status": "ok", **result}
     try:
         results, _ = asyncio.run(_run_pipeline())
         return {

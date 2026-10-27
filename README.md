@@ -734,6 +734,14 @@ Then manually re-ingest the EU AI Act, GDPR, and FINMA PDFs using the steps abov
 
 ## Project Progress
 
+### 20261027 — Radar movement history for Phase 7
+
+- New table `radar_entry_history` (Alembic `a6c3e9f1b2d4`): one row per technology per pipeline run. `radar_entries` only knows this week and last week, so the monthly movement history Phase 7 needs was not stored before
+- Radar pipeline phase 3b writes the rows after change detection (non-critical: a failure is reported, the report still runs). The table is created on first use, so no manual migration is needed in the Lambda
+- One-off backfill from the report JSONs on S3, run through the radar pipeline Lambda:
+  `{"action": "backfill_history"}` (dry run, shows first/last date and row count), then `{"action": "backfill_history", "dry_run": false}`. Existing rows are never overwritten
+- Retention 24 months, enforced by the cleanup Lambda (same as radar reports)
+
 ### 20260630 — Compliance documentation layer + Skills Hub category fix
 
 **Compliance documentation layer (`/compliance`):**
