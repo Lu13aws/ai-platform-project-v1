@@ -40,6 +40,9 @@ _RECORD_SQL = text(
     """
 )
 
+# asyncpg allows at most 32767 bind parameters per statement; a history row has 10 columns.
+_BACKFILL_BATCH_ROWS = 1000
+
 
 async def ensure_table(session: AsyncSession) -> None:
     """Create radar_entry_history if missing (no alembic in the Lambda image)."""
@@ -126,9 +129,10 @@ async def backfill(session: AsyncSession, s3: S3Client | None = None, dry_run: b
         return result
 
     await ensure_table(session)
-    stmt = insert(RadarEntryHistory).values(rows).on_conflict_do_nothing(
-        constraint="uq_radar_entry_history_tech_vendor_date"
-    )
-    result.rows_inserted = (await session.execute(stmt)).rowcount
+    for start in range(0, len(rows), _BACKFILL_BATCH_ROWS):
+        stmt = insert(RadarEntryHistory).values(rows[start:start + _BACKFILL_BATCH_ROWS]).on_conflict_do_nothing(
+            constraint="uq_radar_entry_history_tech_vendor_date"
+        )
+        result.rows_inserted += (await session.execute(stmt)).rowcount
     print(f"  [history] backfill inserted {result.rows_inserted} of {result.rows_built} rows")
     return result

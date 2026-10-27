@@ -2,12 +2,16 @@
 
 import asyncio
 import importlib
+import json
 import sys
 from datetime import date
+from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
+from aiplatform.agents import radar_history
 from aiplatform.agents.radar_history import BackfillResult, rows_from_reports
+from sqlalchemy.dialects import postgresql
 
 
 def _report(generated_at: str, *entries: tuple[str, str, str]) -> dict:
@@ -104,6 +108,39 @@ class _fake_session:  # noqa: N801 — stands in for the get_async_session() con
 
     async def __aexit__(self, *exc):
         return False
+
+
+class _RecordingSession:
+    """Fake AsyncSession: serves report keys, counts bind parameters per INSERT."""
+
+    def __init__(self, keys: list[str]):
+        self.keys = keys
+        self.params_per_insert: list[int] = []
+
+    async def scalars(self, _stmt):
+        return SimpleNamespace(all=lambda: self.keys)
+
+    async def execute(self, stmt):
+        compiled = stmt.compile(dialect=postgresql.dialect())
+        self.params_per_insert.append(len(compiled.params))
+        return SimpleNamespace(rowcount=len(compiled.params) // 10)
+
+
+def test_backfill_of_production_size_stays_under_the_asyncpg_parameter_limit(monkeypatch):
+    # 21 runs x 170 entries = 3570 rows; one INSERT would need 35700 parameters (limit 32767)
+    entries = [(f"Tech {i}", "Vendor", "Assess") for i in range(170)]
+    reports = {f"radar/{d:02d}.json": _report(f"2026-07-{d:02d}T06:01:00+00:00", *entries) for d in range(1, 22)}
+    s3 = SimpleNamespace(download=AsyncMock(side_effect=lambda key: json.dumps(reports[key])))
+    session = _RecordingSession(list(reports))
+    monkeypatch.setattr(radar_history, "ensure_table", AsyncMock())
+
+    result = asyncio.run(radar_history.backfill(session, s3=s3, dry_run=False))
+
+    assert result.errors == []
+    assert result.rows_built == 3570
+    assert result.rows_inserted == 3570
+    assert len(session.params_per_insert) == 4
+    assert max(session.params_per_insert) <= 32767
 
 
 def test_history_failure_does_not_stop_the_pipeline(radar_handler, monkeypatch):
