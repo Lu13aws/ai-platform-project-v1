@@ -6,6 +6,8 @@
 >
 > **In 60 seconds:** scheduled Lambda agents collect public signals for three radars (technology, competitors, regulation), classify them with an LLM, store them in PostgreSQL + pgvector and answer questions with cited sources (single-pass RAG). A corporate prototype adds Cognito-based RBAC and an audit log. The public demo caps AI questions at 150 per day to keep costs bounded. Live: [platform.bridging-data.com](https://platform.bridging-data.com).
 
+Start here: [Vision and Scope](docs/VISION.md) · [Architecture decisions](docs/adr/README.md) · [Phase 7 concept](docs/phase7/CONCEPT.md)
+
 ## Project Description
 
 Modular AI knowledge platform built on AWS using PostgreSQL + pgvector, FastAPI, and OpenAI / Anthropic LLMs.
@@ -70,10 +72,13 @@ ai-platform-project-v1/
 │   └── AI_LIMITATIONS.md         # Client-facing disclaimer (hallucination, bias, human review)
 ├── migrations/             # Alembic migrations (shared schema, one history)
 │   └── versions/
-├── research/               # Architecture decisions, dataset notes, feasibility docs
-│   ├── architecture/
-│   ├── datasets/
-│   └── notes/
+├── docs/
+│   ├── VISION.md           # One-page vision, goals and scope
+│   ├── adr/                # Architecture Decision Records (why the platform is built this way)
+│   ├── phase7/CONCEPT.md   # Phase 7 plan: user stories, data readiness, sequencing
+│   └── *.jpg               # Architecture diagrams per phase
+├── research/
+│   └── phase6/             # Compliance mapping (NIST AI RMF, GDPR/DSG, AWS WAF)
 ├── tests/
 │   ├── unit/               # No I/O — runs without Docker
 │   ├── integration/        # Requires Docker (make dev-up + make migrate)
