@@ -162,7 +162,7 @@ def sync_app_secret(sm, iam) -> None:
 def deploy_lambda(lmb, role_arn: str, env_vars: dict[str, str], vpc: dict | None) -> str:
     config: dict = {
         "Environment": {"Variables": env_vars},
-        "Timeout": 300,    # 5 minutes — allows ~100 LLM calls
+        "Timeout": 900,    # 15 minutes — ~3 s per LLM call sequentially, 100 calls need ~330 s
         "MemorySize": 512,
         "ImageConfig": {"Command": HANDLER_CMD},
     }
@@ -273,7 +273,7 @@ def main() -> None:
   Function  : {FUNCTION_NAME}
   Handler   : {HANDLER_CMD[0]}
   Schedule  : {EVENTBRIDGE_SCHEDULE} (Monday 06:00 UTC)
-  Timeout   : 300s
+  Timeout   : 900s
   Memory    : 512 MB
 {vpc_note}
 
