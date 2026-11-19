@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "report_id": "00000000-0000-0000-0000-000000000001",
+  "period": { "month": "2026-11", "from": "2026-11-01", "to": "2026-11-30" },
+  "generated_at": "2026-12-02T09:00:00+00:00",
+  "published_at": "2026-12-02T18:30:00+00:00",
+  "domains": ["technology_radar", "competitor_radar"],
+  "domains_pending": ["regulatory_radar"],
+  "coverage": {
+    "companies": ["AWS", "Anthropic", "Google", "Microsoft", "Mistral AI", "OpenAI"],
+    "radar_moves": 14,
+    "competitor_signals": 236,
+    "excluded": { "pricing_page_updated": 11 }
+  },
+  "insights": [
+    {
+      "id": "ins-1",
+      "company": "Example Vendor",
+      "headline": "EXAMPLE: radar promotion and product launch in the same month",
+      "summary": "EXAMPLE DATA, NOT A REAL FINDING. The radar moved Example Model from Assess to Trial while the vendor announced general availability of the same model.",
+      "citations": [
+        {
+          "domain": "technology_radar",
+          "record_id": "00000000-0000-0000-0000-000000000011",
+          "date": "2026-11-09",
+          "title": "Example Model: Assess → Trial",
+          "excerpt": "EXAMPLE: Broader availability and stable pricing make Example Model ready for limited production trials.",
+          "url": null
+        },
+        {
+          "domain": "competitor_radar",
+          "record_id": "00000000-0000-0000-0000-000000000012",
+          "date": "2026-11-05",
+          "title": "EXAMPLE: Example Model is now generally available",
+          "excerpt": "EXAMPLE: The vendor announced general availability in all regions.",
+          "url": "https://example.com/news/example-model-ga"
+        }
+      ],
+      "verification": {
+        "rules_passed": true,
+        "verifier": {
+          "provider": "anthropic",
+          "model": "example-model",
+          "verdict": "supported",
+          "reason": "EXAMPLE: Both cited records name the same model and fall in the same month."
+        },
+        "human_review": "approved"
+      }
+    }
+  ],
+  "withheld_count": 1,
+  "empty_reason": null,
+  "disclaimer": "AI-generated from public data collected by two of three platform radars (technology and competitors). Patterns describe what happened at the same time; they are not advice. Every insight links to its sources."
+}

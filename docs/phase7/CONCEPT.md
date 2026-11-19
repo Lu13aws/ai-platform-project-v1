@@ -1,6 +1,6 @@
 # Phase 7 Concept: Intelligence Layer
 
-- **Status:** Draft, 2026-10-27
+- **Status:** Draft, 2026-10-27; decisions added 2026-11-19 (section 7)
 - **Earliest start:** December 2026
 - **Related:** [Vision and Scope](../VISION.md), [ADR 0002](../adr/0002-standard-rag-until-phase-7.md), roadmap in [`CLAUDE.md`](../../CLAUDE.md)
 
@@ -92,7 +92,42 @@ the agents run on the existing shared Lambda image ([ADR 0004](../adr/0004-lambd
 - New data sources. Phase 7 works on what the three radars already collect.
 - Consulting features (BA agent, proposal generator).
 
-## 7. Open questions
+## 7. Decisions (2026-11-19)
+
+Based on a data check on 2026-11-19 (1504 competitor signals, 412 radar signals, 4314 rows of radar
+history, 10 regulatory changes, mostly minor OWASP page edits):
+
+| Topic | Decision | Reason |
+|---|---|---|
+| Domains | Start with Technology Radar and Competitor Radar; the Regulatory Radar joins later | Volume and history are met for the two radars; regulatory data is too thin and has no company link |
+| Overlap | Only AWS and Anthropic appear in both radars today (Databricks, the largest radar vendor, is not a tracked competitor) | Known limit of version 1; more radar sources for the other competitors would widen it |
+| Entity key | Fixed alias table in code (`aiplatform/agents/synthesis_entities.py`), no LLM | AWS alone appears under four vendor spellings in the radar |
+| Noise | Radar moves count only if they hold for two runs; competitor signals "pricing page updated" are left out | Radar categories oscillate for some entries; those pricing signals carry no price |
+| Display | Public page `/intelligence` on the portfolio website, reading `synthesis/reports/latest.json` | The platform UI is behind a login with self-registration closed |
+| Contract | [REPORT_SCHEMA.md](REPORT_SCHEMA.md) with an example JSON | Both repositories build against the same file |
+| Verification | 1. deterministic rules (cited IDs exist, period, company, both domains); 2. a verifier agent on a different LLM provider than the generator; 3. the owner approves every report for the first 2 to 3 months, then only insights that fail 1 or 2 | An LLM checking an LLM catches many errors but not all; manual approval first measures whether the verifier agrees with the owner |
+| Executive brief | US-5's "at least three insights" is dropped for now; an empty month is valid (US-6) | Two domains with two overlapping companies will often find fewer than three patterns |
+
+Before the agent is built, `scripts/synthesis_backtest.py` replays the existing S3 reports and counts,
+per month, the companies with signals in both radars. If that number stays near zero, the agent waits.
+
+**Backtest result (2026-11-19, 36 radar and 32 competitor reports, June to November 2026):**
+
+- AWS and Anthropic have signals in both radars every month, so "both radars active" is always true
+  and says nothing on its own. Google, Microsoft and Mistral AI never appear in the technology radar;
+  OpenAI twice.
+- The technology radar reads only three sources (AWS news, Anthropic news, Databricks blog), and the
+  competitor radar reads the same Anthropic news page. Most matches are the same announcement counted
+  twice ("Anthropic launched X" and "radar added X"), not two independent observations.
+- Confirmed category moves of tracked companies: 8 in five months, and 6 of them are reversals of an
+  earlier move (Claude Trial→Adopt→Trial, Fable 5 Trial→Assess→Trial, AWS Builder Center
+  Trial→Adopt→Trial). They reflect week-to-week LLM classification, not a change in the market.
+
+Conclusion: with the current sources a two-domain SynthesisAgent would mostly restate vendor
+announcements. It becomes meaningful once the technology radar has sources that do not come from the
+vendors themselves, and once its categories are stable enough that a move means something.
+
+## 8. Open questions
 
 1. What exactly counts as a pattern: same vendor in two domains within one month, or also topic-level links (for example a pricing move plus a new AI Act obligation)?
 2. Should synthesis outputs be visible on the public platform, or only to logged-in users?
