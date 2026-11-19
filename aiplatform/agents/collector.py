@@ -153,6 +153,7 @@ class CollectorAgent:
         # Content: prefer full content, fall back to description/summary
         raw_content = (
             text("encoded", "content")
+            or text("content", "atom")
             or text("description")
             or text("summary", "atom")
         )

@@ -11,7 +11,7 @@ Cost control: MAX_LLM_CALLS_PER_RUN setting hard-stops the agent.
 import json
 import re
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -24,6 +24,11 @@ from aiplatform.storage.radar_models import RadarEntry, RadarSignal, RawArticle
 _VALID_CATEGORIES = {"Adopt", "Trial", "Assess", "Hold"}
 _VALID_TRENDS = {"up", "stable", "down"}
 _CATEGORY_RANK = {"Adopt": 3, "Trial": 2, "Assess": 1, "Hold": 0}
+
+# An existing entry's category is decided by its recent signals, not by the newest one alone.
+_CATEGORY_WINDOW_DAYS = 90
+_CATEGORY_MAX_VOTES = 10
+_MIN_VOTES_TO_MOVE = 2
 
 _SYSTEM_PROMPT = """\
 You are a technology radar analyst. Your job is to read technology news articles
@@ -196,6 +201,20 @@ class AnalyzerAgent:
         )
 
         if existing:
+            # The category follows the recent signals as a whole, not the newest article alone
+            # (one article per week used to flip entries back and forth, e.g. Claude Trial→Adopt→Trial).
+            await session.flush()  # include the signal saved for this article
+            votes = (await session.execute(
+                select(RadarSignal.category, RadarSignal.confidence_score)
+                .where(
+                    RadarSignal.technology_name == tech_name,
+                    RadarSignal.vendor == vendor,
+                    RadarSignal.signal_date >= datetime.now(UTC) - timedelta(days=_CATEGORY_WINDOW_DAYS),
+                )
+                .order_by(RadarSignal.signal_date.desc())
+                .limit(_CATEGORY_MAX_VOTES)
+            )).all()
+            new_category = decide_category(existing.category, [(c, s) for c, s in votes])
             trend = _calculate_trend(existing.category, new_category)
             existing.category = new_category
             existing.summary = signal_text
@@ -219,6 +238,26 @@ class AnalyzerAgent:
 # ------------------------------------------------------------------
 # Helpers
 # ------------------------------------------------------------------
+
+def decide_category(current: str, votes: list[tuple[str, float]]) -> str:
+    """Category of an existing entry, given its recent signals as (category, confidence) votes.
+
+    The entry moves only if another category has more confidence-weighted support than the current
+    one and at least _MIN_VOTES_TO_MOVE signals behind it; otherwise it stays where it is.
+    """
+    weight: dict[str, float] = {}
+    count: dict[str, int] = {}
+    for category, confidence in votes:
+        category = _validated_category(category)
+        weight[category] = weight.get(category, 0.0) + max(0.0, min(1.0, float(confidence or 0.0)))
+        count[category] = count.get(category, 0) + 1
+    if not weight:
+        return current
+    best = max(weight, key=lambda c: (weight[c], c == current))
+    if best != current and count[best] >= _MIN_VOTES_TO_MOVE and weight[best] > weight.get(current, 0.0):
+        return best
+    return current
+
 
 def _validated_category(value: str) -> str:
     cat = str(value).strip().title()

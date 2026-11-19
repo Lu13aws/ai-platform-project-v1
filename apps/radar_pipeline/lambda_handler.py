@@ -18,6 +18,8 @@ Triggered by EventBridge weekly schedule (Monday 06:00 UTC).
 
 Direct invoke {"action": "backfill_history"} rebuilds radar_entry_history from the report
 JSONs on S3 (dry run unless "dry_run": false).
+Direct invoke {"action": "sync_sources"} adds missing sources from aiplatform/agents/radar_sources.py
+(dry run unless "dry_run": false).
 """
 
 import asyncio
@@ -25,7 +27,7 @@ import json
 import traceback
 from datetime import UTC, datetime
 
-from aiplatform.agents import radar_history
+from aiplatform.agents import radar_history, radar_sources
 from aiplatform.agents.analyzer import AnalyzerAgent
 from aiplatform.agents.change_detector import ChangeDetectionAgent, ChangeReport
 from aiplatform.agents.collector import CollectorAgent
@@ -64,6 +66,14 @@ async def _backfill_history(dry_run: bool) -> dict:
         async with get_async_session() as session:
             result = await radar_history.backfill(session, dry_run=dry_run)
         return {"dry_run": dry_run, **result.as_dict()}
+    finally:
+        await engine.dispose()
+
+
+async def _sync_sources(dry_run: bool) -> dict:
+    try:
+        async with get_async_session() as session:
+            return await radar_sources.sync_sources(session, dry_run=dry_run)
     finally:
         await engine.dispose()
 
@@ -126,6 +136,9 @@ def handler(event, context):
     if event.get("action") == "backfill_history":
         # anything but an explicit false stays a dry run
         result = asyncio.run(_backfill_history(dry_run=event.get("dry_run") is not False))
+        return {"status": "ok", **result}
+    if event.get("action") == "sync_sources":
+        result = asyncio.run(_sync_sources(dry_run=event.get("dry_run") is not False))
         return {"status": "ok", **result}
     try:
         results, _ = asyncio.run(_run_pipeline())

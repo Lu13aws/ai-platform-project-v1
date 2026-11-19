@@ -363,11 +363,17 @@ All sources are public documents. No personal or confidential data is used in Ph
 
 | Source | Type | URL |
 |---|---|---|
-| AWS | RSS + HTML | aws.amazon.com/blogs/aws/ |
-| Databricks | HTML | databricks.com/blog |
-| Anthropic | HTML | anthropic.com/news |
+| AWS | RSS (vendor) | aws.amazon.com/blogs/aws/ |
+| Databricks | RSS (vendor) | databricks.com/blog |
+| Anthropic | HTML (vendor) | anthropic.com/news |
+| The New Stack | RSS (independent) | thenewstack.io |
+| The Register AI/ML | Atom (independent) | theregister.com/software/ai_ml |
+| Simon Willison | Atom (independent) | simonwillison.net |
+| Ars Technica AI | RSS (independent) | arstechnica.com/ai |
 
-Sources are seeded via `scripts/seed_radar_sources.py`. New sources can be added to the `radar_sources` table.
+The source list lives in `aiplatform/agents/radar_sources.py`. Locally: `scripts/seed_radar_sources.py`; in production (private VPC): invoke the radar Lambda with `{"action": "sync_sources"}` (dry run), then `{"action": "sync_sources", "dry_run": false}`. Missing sources are added; existing ones are never changed.
+
+An existing entry's category follows its signals of the last 90 days (confidence-weighted, at most 10); it moves only if at least two signals support the new category. Before 2026-11-19 the newest article alone set the category, which made entries flip back and forth.
 
 ---
 
